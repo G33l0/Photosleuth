@@ -1,4 +1,3 @@
-```markdown
 # 🔍 PhotoSleuth
 
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/IamG2/photosleuth)
@@ -164,5 +163,3 @@ Found a bug? Have an idea for a new feature? Open an issue or submit a pull requ
 
 Happy sleuthing!
 – IamG2
-
-```
