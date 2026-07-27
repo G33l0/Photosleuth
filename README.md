@@ -4,9 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.6+](https://img.shields.io/badge/python-3.6+-blue.svg)](https://www.python.org/downloads/)
 
-**Ultimate Image Metadata & Location Analyzer** – developed by **IamG2**
-
-PhotoSleuth is a lightweight yet powerful command‑line tool that extracts every scrap of metadata from your images – EXIF, GPS coordinates, camera settings, timestamps, and more. It then turns raw GPS data into a human‑readable address and a Google Maps link, so you can see exactly where the photo was taken.
+**The all‑in‑one image analysis toolkit** – extract metadata, pinpoint locations, reverse‑search the web, and scrub sensitive data.  
+Developed by **IamG2**.
 
 ---
 
@@ -15,8 +14,9 @@ PhotoSleuth is a lightweight yet powerful command‑line tool that extracts ever
 - [Features](#-features)
 - [Installation](#-installation)
 - [Usage](#-usage)
-  - [Interactive Mode](#interactive-mode-recommended)
+  - [Interactive Mode](#interactive-mode)
   - [Command‑Line Mode](#command-line-mode)
+- [Configuration](#-configuration)
 - [Examples](#-examples)
 - [Disclaimer](#-disclaimer)
 - [Efficiency](#-efficiency)
@@ -27,20 +27,21 @@ PhotoSleuth is a lightweight yet powerful command‑line tool that extracts ever
 
 ## ✨ Features
 
-- **Full EXIF extraction** – camera model, shutter speed, ISO, date, lens, flash, and hundreds of other tags.
-- **GPS to address** – automatic reverse geocoding using OpenStreetMap (with built‑in caching to avoid rate limits).
-- **Google Maps link** – generates a direct URL to view the location in your browser.
-- **Verbose mode** – dump every single metadata field for forensic or deep‑dive analysis.
-- **Batch processing** – scan all images in a folder at once.
-- **Export reports** – save results as structured JSON or plain text.
-- **Interactive menu** – no command‑line fu required; just run and explore.
-- **Fast & lightweight** – only two dependencies; geocoding results are cached for instant reuse.
+- **Full EXIF extraction** – camera, lens, exposure, ISO, date, and hundreds of tags.
+- **GPS geocoding** – converts coordinates to a human‑readable address and generates a Google Maps link.
+- **Reverse image search** – uses Google Vision API to find web entities and matching pages (configurable).
+- **EXIF stripping** – removes all metadata from a copy, protecting your privacy.
+- **Interactive map** – plots all geotagged images on an HTML map (using `folium`).
+- **CSV export** – exports metadata tables for further analysis in spreadsheets.
+- **Batch processing** – analyse entire folders at once.
+- **Persistent configuration** – API keys and privacy settings stored in `config.json`.
+- **Interactive menu** – no command‑line fu required; everything is menu‑driven.
 
 ---
 
 ## 📦 Installation
 
-1. **Clone the repository** (or download the ZIP):
+1. **Clone** the repository:
    ```bash
    git clone https://github.com/IamG2/photosleuth.git
    cd photosleuth
@@ -50,19 +51,18 @@ PhotoSleuth is a lightweight yet powerful command‑line tool that extracts ever
    ```bash
    pip install -r requirements.txt
    ```
-3. (Optional) Install as a global command:
+3. (Optional) Install globally:
    ```bash
    pip install .
    ```
-   Now you can run photosleuth from anywhere.
 
 ---
 
 🧭 Usage
 
-Interactive Mode (Recommended)
+Interactive Mode
 
-If you just want to poke around without memorising flags, run:
+Just run:
 
 ```bash
 python -m photosleuth.cli
@@ -74,90 +74,104 @@ or, if installed globally:
 photosleuth
 ```
 
-You’ll see a friendly menu:
+You’ll see a menu with options for:
 
-```
-============================================================
-  PHOTOSLEUTH - Interactive Mode
-============================================================
-  1. Analyze a single image
-  2. Analyze all images in a directory
-  3. Show all metadata (verbose)
-  4. Generate map link for GPS
-  5. Save report to file
-  0. Exit
-============================================================
-```
-
-Choose an option, provide the requested paths, and PhotoSleuth does the rest.
-
----
+· Analysing images (single or batch)
+· Viewing verbose metadata
+· Generating a map or CSV report
+· Reverse image searching
+· Stripping EXIF
+· Configuring API keys and preferences
 
 Command‑Line Mode
 
-For scripting or quick one‑offs, use the CLI arguments:
+For scripting and automation:
 
 ```bash
-# Basic analysis (shows GPS, address, map link if available)
+# Basic analysis (shows GPS, address, map link)
 photosleuth -i vacation.jpg
 
-# Show every EXIF tag (verbose)
+# Verbose – all EXIF tags
 photosleuth -i vacation.jpg -a
 
-# Analyze an entire folder
+# Analyse a directory
 photosleuth -d ./holiday_photos
 
-# Save a JSON report (or .txt for plain text)
-photosleuth -i vacation.jpg -o report.json
-photosleuth -i vacation.jpg -o report.txt
+# Generate an interactive map and CSV from a directory
+photosleuth -d ./holiday_photos --map --csv
+
+# Reverse image search
+photosleuth -i mystery.jpg --search
+
+# Strip EXIF (creates a copy with _clean suffix)
+photosleuth -i secret.jpg --strip
+
+# Strip and overwrite the original (use with care)
+photosleuth -i secret.jpg --strip --overwrite
 ```
+
+---
+
+⚙️ Configuration
+
+API keys and privacy settings are stored in config.json (created automatically on first run).
+Use the Interactive Menu → Configuration to set:
+
+· Google Vision API key (required for reverse search)
+· TinEye API key (planned)
+· Default search engine
+· Output suffix for stripped images (default: _clean)
+· Whether to overwrite originals when stripping
+
+You can also edit config.json manually.
 
 ---
 
 📸 Examples
 
-Input: A photo taken with a smartphone that has GPS enabled.
-
-Output (summary):
+Reverse Search Output:
 
 ```
-📄 File: beach_sunset.jpg
-📦 Size: 2456789 bytes
-🕒 Modified: 2025-07-20T18:32:11
-📍 GPS: 34.052235, -118.243683
-🏠 Address: 123 Ocean Ave, Santa Monica, CA 90401, USA
-🗺️  Map: https://www.google.com/maps?q=34.052235,-118.243683
+Entities found:
+  - Eiffel Tower (score: 0.92)
+  - Paris (score: 0.85)
+Pages with matching images: 124
+Full matching images: 3
 ```
 
-Verbose output adds dozens of EXIF fields like Image Make, Model, Exposure Time, F-Number, ISO, Date/Time Original, etc.
+EXIF stripping:
+
+· Input: vacation.jpg
+· Output: vacation_clean.jpg (no EXIF)
 
 ---
 
 ⚠️ Disclaimer
 
-· Ethical use only – use PhotoSleuth on images you own, have explicit permission to analyse, or for legitimate forensic/educational purposes.
-· Geocoding relies on the free Nominatim service. Please respect their usage policy – limit to 1 request per second and provide a proper User-Agent (we already do).
-· Privacy – your images stay on your machine; no data is ever uploaded or shared.
+· Ethical use only – use on images you own or have permission to analyse.
+· Reverse search uses Google Vision API; you need a valid API key. Charges may apply – check Google’s pricing.
+· Geocoding uses Nominatim – respect their usage policy (1 req/sec).
+· Your images never leave your machine except when explicitly using the reverse search API (image is sent to Google).
 
 ---
 
 ⚡ Efficiency
 
-· Geocoding cache – once an address is resolved for a coordinate pair, it’s stored in memory. Any subsequent photo with the same location returns the address instantly – no repeated network calls.
-· Minimal dependencies – only exifread and geopy; the tool is light and starts fast.
-· Offline‑friendly – if an image lacks GPS, no external requests are made; you can use it entirely offline.
+· Geocoding cache – addresses are stored to avoid repeated network calls.
+· Batch processing – optimised to handle large folders.
+· Minimal dependencies – only essential libraries.
 
 ---
 
 📄 License
 
-This project is licensed under the MIT License – feel free to use, modify, and distribute, provided you retain the original author credit (IamG2).
+MIT – free to use, modify, and distribute with credit to IamG2.
 
 ---
 
 🙌 Contributing
 
-Found a bug? Have an idea for a new feature? Open an issue or submit a pull request – contributions are always welcome!
+Feedback, issues, and PRs are always welcome. Let’s make PhotoSleuth even better together.
 
 ---
 
