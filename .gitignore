@@ -21,3 +21,10 @@ photosleuth.csv
 Thumbs.db
 .idea/
 .vscode/
+
+# PyInstaller / Inno Setup build output
+*.spec.bak
+dist/
+build/
+PhotoSleuthData/
+portable.txt

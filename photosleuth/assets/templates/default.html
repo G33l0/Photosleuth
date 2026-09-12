@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ title }}</title>
+<style>
+  @page { size: A4; margin: 18mm 14mm; }
+  body { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: #16202e;
+         font-size: 11pt; line-height: 1.45; margin: 0; }
+  .masthead { width: 100%; border-bottom: 3px solid {{ accent }}; margin-bottom: 18px; }
+  .masthead td { border: none; padding: 0 0 12px 0; vertical-align: middle; }
+  .masthead h1 { margin: 0; font-size: 20pt; letter-spacing: -0.3px; }
+  .masthead .sub { color: #5b6b7f; font-size: 9.5pt; margin-top: 2px; }
+  h2 { font-size: 13pt; margin: 22px 0 8px; padding-bottom: 4px;
+       border-bottom: 1px solid #d9e0e8; color: {{ accent }}; }
+  table { border-collapse: collapse; width: 100%; font-size: 9.5pt; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid #e5eaf0;
+           vertical-align: top; word-break: break-word; }
+  th { background: #f3f6f9; font-weight: 600; width: 30%; }
+  .cards { margin-top: 6px; }
+  .card { border: 1px solid #dde4ec; border-radius: 6px; padding: 12px 14px; margin-bottom: 14px; }
+  .card h3 { margin: 0 0 8px; font-size: 11.5pt; }
+  .thumb { border: 1px solid #cfd8e3; border-radius: 4px; }
+  .cardgrid { width: 100%; }
+  .cardgrid > tr > td { border: none; padding: 0; }
+  .flag { display: inline-block; background: #fdecec; color: #a3232b; border: 1px solid #f3c7c7;
+          border-radius: 3px; padding: 1px 7px; font-size: 8.5pt; margin: 2px 4px 2px 0; }
+  .ok { background: #eaf7ee; color: #1d6b34; border-color: #c3e6cf; }
+  .summary td, .summary th { border: none; padding: 3px 8px 3px 0; }
+  .muted { color: #6b7a8d; }
+  .footer { margin-top: 26px; padding-top: 10px; border-top: 1px solid #d9e0e8;
+            color: #6b7a8d; font-size: 8.5pt; }
+  .mono { font-family: "Consolas", "DejaVu Sans Mono", monospace; font-size: 8.5pt; }
+  .clear { clear: both; }
+</style>
+</head>
+<body>
+
+<table class="masthead">
+  <tr>
+    {% if logo %}<td width="66"><img src="{{ logo }}" width="54" height="54" alt=""></td>{% endif %}
+    <td>
+      <h1>{{ title }}</h1>
+      <div class="sub">
+        {% if organisation %}{{ organisation }} &middot; {% endif %}
+        Generated {{ generated }}{% if author %} by {{ author }}{% endif %}
+      </div>
+    </td>
+  </tr>
+</table>
+
+<h2>Summary</h2>
+<table class="summary">
+  <tr><th>Images analysed</th><td>{{ stats.total }}</td></tr>
+  <tr><th>Geotagged</th><td>{{ stats.geotagged }}</td></tr>
+  <tr><th>With EXIF</th><td>{{ stats.with_exif }}</td></tr>
+  {% if stats.flagged %}<tr><th>Flagged by forensics</th><td>{{ stats.flagged }}</td></tr>{% endif %}
+  {% if stats.date_range %}<tr><th>Capture range</th><td>{{ stats.date_range }}</td></tr>{% endif %}
+  {% if stats.cameras %}<tr><th>Cameras</th><td>{{ stats.cameras }}</td></tr>{% endif %}
+</table>
+
+<h2>Images</h2>
+<div class="cards">
+{% for item in images %}
+  <div class="card">
+    <table class="cardgrid"><tr>
+      {% if item.thumbnail %}
+      <td width="{{ item.thumbnail_width + 16 }}" valign="top" style="border:none;padding:0 16px 0 0;">
+        <img class="thumb" src="{{ item.thumbnail }}" width="{{ item.thumbnail_width }}" height="{{ item.thumbnail_height }}" alt="">
+      </td>
+      {% endif %}
+      <td valign="top" style="border:none;padding:0;">
+    <h3>{{ item.name }}</h3>
+    <table>
+      <tr><th>Path</th><td class="mono">{{ item.file }}</td></tr>
+      <tr><th>Size</th><td>{{ item.size_human }}{% if item.dimensions %} &middot; {{ item.dimensions }}{% endif %}</td></tr>
+      {% if item.date_taken %}<tr><th>Taken</th><td>{{ item.date_taken }}</td></tr>{% endif %}
+      <tr><th>Modified</th><td>{{ item.modified }}</td></tr>
+      {% if item.gps %}
+      <tr><th>Coordinates</th><td>{{ item.coordinates }}</td></tr>
+      {% endif %}
+      {% if item.location %}<tr><th>Address</th><td>{{ item.location }}</td></tr>{% endif %}
+      {% if item.map_url %}<tr><th>Map</th><td class="mono">{{ item.map_url }}</td></tr>{% endif %}
+      {% for label, value in item.summary.items() %}
+      <tr><th>{{ label }}</th><td>{{ value }}</td></tr>
+      {% endfor %}
+      {% if item.sha256 %}<tr><th>SHA-256</th><td class="mono">{{ item.sha256 }}</td></tr>{% endif %}
+      {% if item.forensics %}
+      <tr><th>Thumbnail check</th><td>
+        {% if item.forensics.flags %}
+          {% for flag in item.forensics.flags %}<span class="flag">{{ flag }}</span>{% endfor %}
+        {% else %}<span class="flag ok">No anomalies detected</span>{% endif %}
+      </td></tr>
+      {% endif %}
+    </table>
+      </td>
+    </tr></table>
+  </div>
+{% endfor %}
+</div>
+
+{% if custody %}
+<h2>Chain of Custody</h2>
+<table>
+  <tr><th style="width:18%">Time</th><th style="width:18%">Action</th><th>Detail</th></tr>
+  {% for entry in custody %}
+  <tr>
+    <td class="mono">{{ entry.timestamp }}</td>
+    <td>{{ entry.action }}</td>
+    <td class="mono">{{ entry.file_name }}{% if entry.sha256 %}<br><span class="muted">{{ entry.sha256 }}</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<div class="footer">
+  {% if footer_note %}{{ footer_note }}<br>{% endif %}
+  Produced with PhotoSleuth {{ version }}. Metadata is reported as found in the source files;
+  absence of evidence of editing is not evidence of authenticity.
+</div>
+
+</body>
+</html>

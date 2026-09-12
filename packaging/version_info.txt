@@ -1,0 +1,25 @@
+# UTF-8
+# Windows version resource for PhotoSleuth.exe
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 1, 0, 0),
+    prodvers=(1, 1, 0, 0),
+    mask=0x3f, flags=0x0, OS=0x40004, fileType=0x1, subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        '040904B0',
+        [StringStruct('CompanyName', 'IamG2'),
+         StringStruct('FileDescription', 'PhotoSleuth - Image Metadata & Location Analyzer'),
+         StringStruct('FileVersion', '1.1.0'),
+         StringStruct('InternalName', 'PhotoSleuth'),
+         StringStruct('LegalCopyright', 'MIT Licence. Copyright IamG2.'),
+         StringStruct('OriginalFilename', 'PhotoSleuth.exe'),
+         StringStruct('ProductName', 'PhotoSleuth'),
+         StringStruct('ProductVersion', '1.1.0')])
+    ]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)

@@ -45,9 +45,20 @@ def test_updating_one_section_keeps_the_others(isolated_config):
 
 def test_unknown_engine_is_rejected(isolated_config):
     with pytest.raises(ValueError):
-        config.set_api_key("bing", "x")
+        config.set_default_engine("altavista")
+
+
+def test_api_keys_only_accept_engines_that_use_them(isolated_config):
+    """Browser-handoff engines take no key, so storing one is a mistake."""
     with pytest.raises(ValueError):
-        config.set_default_engine("bing")
+        config.set_api_key("yandex", "x")
+    config.set_api_key("google_vision", "ok")
+    assert config.get_api_key("google_vision") == "ok"
+
+
+def test_browser_engines_can_be_the_default(isolated_config):
+    config.set_default_engine("yandex")
+    assert config.load_config()["default_search_engine"] == "yandex"
 
 
 def test_config_home_follows_env_override(isolated_config):

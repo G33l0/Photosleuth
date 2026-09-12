@@ -14,7 +14,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 APP_NAME = "PhotoSleuth"
 
@@ -35,9 +35,79 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "timeout_seconds": 10,
         "cache_enabled": True,
     },
+    "ui": {
+        "theme": "system",              # system | light | dark
+        "language": "system",
+        "thumbnail_size": 160,
+        "restore_session": True,
+        "confirm_destructive": True,
+        "auto_analyze_on_open": True,
+        "max_recent": 12,
+    },
+    "session": {
+        "recent_files": [],
+        "recent_folders": [],
+        "last_folder": "",
+        "window_geometry": "",
+        "window_state": "",
+        "splitter_sizes": [],
+        "last_tab": 0,
+    },
+    "custody": {
+        "enabled": True,
+        "log_file": "",
+    },
+    "updates": {
+        "check_on_startup": False,
+        "repository": "g33l0/photosleuth",
+        "last_check": "",
+    },
+    "reports": {
+        "template": "default",
+        "custom_template_dir": "",
+        "organisation": "",
+        "author": "",
+        "logo_path": "",
+        "accent_colour": "#1694b2",
+        "footer_note": "",
+        "include_thumbnails": True,
+        "include_map": True,
+        "include_forensics": True,
+        "include_custody": False,
+    },
 }
 
+# Engines that accept a stored API key.
 SEARCH_ENGINES = ("google_vision", "tineye")
+
+# Every engine selectable as the default, including browser-handoff ones.
+ALL_SEARCH_ENGINES = (
+    "google_vision", "tineye", "google_lens", "yandex", "bing", "tineye_web",
+)
+
+
+PORTABLE_MARKERS = ("portable.txt", "PhotoSleuth.portable", ".portable")
+
+
+def install_root() -> Path:
+    """Directory holding the running executable (frozen) or the package."""
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent.parent
+
+
+def portable_marker() -> Optional[Path]:
+    """Return the portable-mode marker file, if one sits beside the app."""
+    root = install_root()
+    for name in PORTABLE_MARKERS:
+        candidate = root / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def is_portable() -> bool:
+    return portable_marker() is not None
 
 
 def config_home() -> Path:
@@ -45,6 +115,11 @@ def config_home() -> Path:
     override = os.environ.get("PHOTOSLEUTH_HOME")
     if override:
         return Path(override).expanduser()
+
+    # Portable mode: keep everything next to the executable so the whole app
+    # can live on a USB stick without touching the host machine.
+    if is_portable():
+        return install_root() / "PhotoSleuthData"
     if sys.platform.startswith("win"):
         base = os.environ.get("APPDATA") or os.path.expanduser("~")
         return Path(base) / APP_NAME
@@ -143,9 +218,34 @@ def set_api_key(engine: str, key: str) -> None:
 
 
 def set_default_engine(engine: str) -> None:
-    if engine not in SEARCH_ENGINES:
-        raise ValueError(f"Unknown search engine: {engine!r}. Expected one of {', '.join(SEARCH_ENGINES)}.")
+    if engine not in ALL_SEARCH_ENGINES:
+        raise ValueError(
+            f"Unknown search engine: {engine!r}. Expected one of {', '.join(ALL_SEARCH_ENGINES)}."
+        )
     update_config(default_search_engine=engine)
+
+
+def remember_recent(kind: str, path) -> List[str]:
+    """Push *path* onto the front of a recent-files/folders list."""
+    key = "recent_files" if kind == "file" else "recent_folders"
+    config = load_config()
+    limit = int(config.get("ui", {}).get("max_recent", 12))
+    entries = [str(item) for item in config.get("session", {}).get(key, []) if item]
+    text = str(path)
+    entries = [item for item in entries if item != text]
+    entries.insert(0, text)
+    entries = entries[:limit]
+    update_config(session={key: entries})
+    return entries
+
+
+def recent(kind: str) -> List[str]:
+    key = "recent_files" if kind == "file" else "recent_folders"
+    return [str(item) for item in load_config().get("session", {}).get(key, []) if item]
+
+
+def clear_recent() -> None:
+    update_config(session={"recent_files": [], "recent_folders": []})
 
 
 def set_privacy_options(output_suffix: str | None = None, overwrite: bool | None = None) -> None:

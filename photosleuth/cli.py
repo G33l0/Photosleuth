@@ -294,6 +294,9 @@ def build_parser() -> argparse.ArgumentParser:
     settings.add_argument("--set-key", metavar="ENGINE=KEY", help="Store an API key, e.g. google_vision=abc123")
     settings.add_argument("--show-config", action="store_true", help="Print the active configuration and exit")
 
+    parser.add_argument("--gui", action="store_true", help="Launch the desktop application")
+    parser.add_argument("paths", nargs="*", help="Image files or folders to open (implies --gui)")
+
     parser.add_argument("-V", "--version", action="version", version=f"PhotoSleuth {__version__}")
     return parser
 
@@ -301,6 +304,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    # The GUI is requested explicitly, or implied by bare paths (which is how
+    # Explorer's "Open with" and the file associations invoke us).
+    if args.gui or args.paths:
+        return _launch_gui(args.paths)
 
     if not args.no_banner and not args.quiet:
         safe_print(banner())
@@ -383,6 +391,21 @@ def main(argv: Optional[List[str]] = None) -> int:
         exit_code = _run_search(args, records) or exit_code
 
     return exit_code
+
+
+def _launch_gui(paths: Optional[List[str]] = None) -> int:
+    """Start the desktop application, explaining clearly if Qt is missing."""
+    try:
+        from .gui.app import run as run_gui
+    except ImportError as exc:
+        safe_print(
+            "❌ The desktop application needs PySide6.\n"
+            "   Install it with:  pip install PySide6\n"
+            f"   ({exc})",
+            stream=sys.stderr,
+        )
+        return EXIT_ERROR
+    return run_gui(list(paths or []))
 
 
 def _run_strip(args, target: str) -> int:

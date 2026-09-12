@@ -17,6 +17,8 @@ dependencies = [
     "Pillow>=9.0.0",
     "requests>=2.25.0",
     "folium>=0.12.0",
+    "piexif>=1.1.3",
+    "Jinja2>=3.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -41,11 +43,22 @@ Issues = "https://github.com/g33l0/photosleuth/issues"
 [project.scripts]
 photosleuth = "photosleuth.cli:run"
 
+[project.gui-scripts]
+photosleuth-gui = "photosleuth.gui.app:main"
+
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "piexif>=1.1.3"]
+gui = ["PySide6>=6.5"]
+dev = ["pytest>=7.0", "pytest-qt>=4.2", "PySide6>=6.5"]
+build = ["pyinstaller>=6.0", "PySide6>=6.5"]
 
 [tool.setuptools.packages.find]
 include = ["photosleuth*"]
+
+[tool.setuptools.package-data]
+photosleuth = [
+    "assets/*.png", "assets/*.ico", "assets/*.svg", "assets/*.bmp",
+    "assets/i18n/*.json", "assets/templates/*.html",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

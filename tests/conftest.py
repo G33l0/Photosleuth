@@ -71,3 +71,73 @@ def not_an_image(tmp_path):
     path = tmp_path / "broken.jpg"
     path.write_text("this is definitely not a jpeg")
     return path
+
+
+def _scene(width=320, height=240, shift=0, seed=11):
+    """A busy, deterministic image so perceptual hashes are meaningful."""
+    import random
+
+    from PIL import ImageDraw
+
+    rng = random.Random(seed)
+    image = Image.new("RGB", (width, height), (30, 60, 110))
+    draw = ImageDraw.Draw(image)
+    for _ in range(14):
+        x, y = rng.randint(0, width), rng.randint(0, height)
+        draw.ellipse(
+            [x, y, x + 60, y + 60],
+            fill=(rng.randint(60, 255), rng.randint(60, 255), 90),
+        )
+    draw.rectangle([30 + shift, 40, 150 + shift, 150], fill=(240, 200, 40))
+    return image
+
+
+def _thumbnail_bytes(image, size=(160, 120)):
+    import io
+
+    buffer = io.BytesIO()
+    image.resize(size, Image.LANCZOS).save(buffer, "JPEG")
+    return buffer.getvalue()
+
+
+@pytest.fixture
+def image_with_matching_thumbnail(tmp_path):
+    """An untouched photo: embedded thumbnail matches the pixels."""
+    scene = _scene()
+    path = tmp_path / "honest.jpg"
+    scene.save(
+        path,
+        exif=piexif.dump({
+            "0th": {piexif.ImageIFD.Make: b"Cam"},
+            "Exif": {}, "GPS": {}, "1st": {},
+            "thumbnail": _thumbnail_bytes(scene),
+        }),
+    )
+    return path
+
+
+@pytest.fixture
+def image_with_stale_thumbnail(tmp_path):
+    """An edited photo: pixels changed, original thumbnail left behind."""
+    original = _scene()
+    edited = _scene(shift=130)
+    path = tmp_path / "tampered.jpg"
+    edited.save(
+        path,
+        exif=piexif.dump({
+            "0th": {
+                piexif.ImageIFD.Make: b"Cam",
+                piexif.ImageIFD.Software: b"Adobe Photoshop 25.0",
+            },
+            "Exif": {}, "GPS": {}, "1st": {},
+            "thumbnail": _thumbnail_bytes(original),
+        }),
+    )
+    return path
+
+
+@pytest.fixture
+def gallery(tmp_path, image_ne, image_sw, image_plain,
+            image_with_matching_thumbnail, image_with_stale_thumbnail):
+    """Every fixture image lives in tmp_path, so this is just the folder."""
+    return tmp_path
