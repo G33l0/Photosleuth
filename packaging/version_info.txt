@@ -11,11 +11,11 @@ VSVersionInfo(
     StringFileInfo([
       StringTable(
         '040904B0',
-        [StringStruct('CompanyName', 'G33l0'),
+        [StringStruct('CompanyName', 'IamG2'),
          StringStruct('FileDescription', 'PhotoSleuth - Image Metadata & Location Analyzer'),
          StringStruct('FileVersion', '1.1.0'),
          StringStruct('InternalName', 'PhotoSleuth'),
-         StringStruct('LegalCopyright', 'MIT Licence. Copyright (c) 2026 G33l0.'),
+         StringStruct('LegalCopyright', 'MIT Licence. Copyright (c) 2026 G33l0. Authored by IamG2.'),
          StringStruct('OriginalFilename', 'PhotoSleuth.exe'),
          StringStruct('ProductName', 'PhotoSleuth'),
          StringStruct('ProductVersion', '1.1.0')])

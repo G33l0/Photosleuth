@@ -54,8 +54,10 @@ from .dialogs.report_dialog import ReportDialog
 from .dialogs.settings_dialog import SettingsDialog
 from .models import ImageLibraryModel, LibraryFilterProxy, PathRole
 from .resources import app_icon, icon
+from .widgets.evidence_board import EvidenceBoardPanel
 from .widgets.forensics_panel import ForensicsPanel
 from .widgets.image_viewer import ImageViewer
+from .widgets.measure_overlay import MeasureMode
 from .widgets.metadata_tree import MetadataTree
 from .widgets.search_panel import SearchPanel
 from .widgets.thumbnail_grid import ThumbnailGrid, collect_dropped_paths
@@ -168,12 +170,19 @@ class MainWindow(QMainWindow):
         self.timeline = TimelineView(self)
         self.timeline.bucketClicked.connect(self._timeline_bucket_clicked)
 
+        self.geolocate = EvidenceBoardPanel(self)
+        self.geolocate.statusMessage.connect(self.status_message)
+        self.geolocate.measureModeRequested.connect(self._start_measuring)
+        self.viewer.measurementComplete.connect(self._measurement_taken)
+        self.viewer.landmarkPlaced.connect(self.geolocate.begin_landmark)
+
         self.tabs = QTabWidget(self)
         self.tabs.addTab(self.viewer, icon("open-file", colours["icon"]), tr("Details"))
         self.tabs.addTab(self.metadata, icon("report", colours["icon"]), "Metadata")
         self.tabs.addTab(self.forensics, icon("shield", colours["icon"]), tr("Forensics"))
         self.tabs.addTab(self.search, icon("web", colours["icon"]), tr("Reverse Search"))
         self.tabs.addTab(self.timeline, icon("timeline", colours["icon"]), tr("Timeline"))
+        self.tabs.addTab(self.geolocate, icon("pin", colours["icon"]), "Geolocate")
 
         self.splitter = QSplitter(Qt.Horizontal, self)
         self.splitter.addWidget(left)
@@ -229,6 +238,17 @@ class MainWindow(QMainWindow):
         self.act_cancel = make(tr("Cancel"), self.cancel_tasks, "Esc", "cancel")
         self.act_cancel.setEnabled(False)
 
+        self.act_geolocate = make(
+            "Geolocate", self.open_geolocate, "F7", "pin",
+            tip="Combine shadows, metadata and landmarks to work out where a photo was taken",
+        )
+        self.act_measure_shadow = make(
+            "Measure Shadow", lambda: self._start_measuring(MeasureMode.SHADOW), "F8", "analyze",
+            tip="Click the object, its base and the shadow tip",
+        )
+        self.act_stop_measuring = make(
+            "Stop Measuring", lambda: self._start_measuring(MeasureMode.NONE), "Shift+Esc",
+        )
         self.act_report = make(tr("Export Report…"), self.export_report, "Ctrl+E", "report")
         self.act_report_selected = make("Export Selection…", lambda: self.export_report(True))
         self.act_custody = make(tr("Chain of Custody"), self.show_custody, "Ctrl+L", "custody")
@@ -307,6 +327,10 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(self.act_strip)
         tools_menu.addAction(self.act_open_maps)
         tools_menu.addSeparator()
+        tools_menu.addAction(self.act_geolocate)
+        tools_menu.addAction(self.act_measure_shadow)
+        tools_menu.addAction(self.act_stop_measuring)
+        tools_menu.addSeparator()
         tools_menu.addAction(self.act_cancel)
 
         reports_menu = bar.addMenu(tr("Reports"))
@@ -328,7 +352,7 @@ class MainWindow(QMainWindow):
             self.act_open_files, self.act_open_folder, None,
             self.act_analyze, self.act_forensics, None,
             self.act_compare, self.act_geotag, self.act_strip, None,
-            self.act_report,
+            self.act_geolocate, self.act_report,
         ):
             toolbar.addSeparator() if action is None else toolbar.addAction(action)
         spacer = QWidget(self)
@@ -486,6 +510,7 @@ class MainWindow(QMainWindow):
         self.metadata.set_metadata(record)
         self.forensics.set_image(path, (record or {}).get("forensics"))
         self.search.set_image(path)
+        self.geolocate.set_record(record)
 
     def _timeline_bucket_clicked(self, label: str, records: List[Dict[str, Any]]) -> None:
         if records:
@@ -633,6 +658,35 @@ class MainWindow(QMainWindow):
                 self._start_analysis(touched)
                 self.status_message(f"Updated the location of {len(touched)} image(s).")
 
+    def open_geolocate(self) -> None:
+        """Show the Evidence Board for the current image."""
+        if not self._current_path:
+            self.status_message("Select an analysed image first.")
+            return
+        self.tabs.setCurrentWidget(self.geolocate)
+        self.geolocate.set_record(self.model.record(self._current_path))
+
+    def _start_measuring(self, mode) -> None:
+        """Switch the preview into a measuring mode and show it."""
+        if not self._current_path:
+            self.status_message("Open an image before measuring.")
+            return
+        self.viewer.set_measure_mode(mode)
+        if mode is not MeasureMode.NONE:
+            self.tabs.setCurrentWidget(self.viewer)
+            self.status_message("Measuring: follow the prompt above the image.")
+        else:
+            self.status_message(tr("Ready"))
+
+    def _measurement_taken(self, measurement) -> None:
+        """A completed on-image measurement feeds straight into the board."""
+        if measurement.mode is MeasureMode.SHADOW:
+            self.geolocate.apply_shadow_measurement(measurement)
+            self.tabs.setCurrentWidget(self.geolocate)
+            self.geolocate.tools.setCurrentIndex(1)
+            self.viewer.set_measure_mode(MeasureMode.NONE)
+            self.status_message("Shadow measured; the Geolocate tab has the numbers.")
+
     def open_in_maps(self) -> None:
         records = self.selected_records()
         opened = 0
@@ -672,6 +726,10 @@ class MainWindow(QMainWindow):
             lambda fmt, path: self.status_message(f"{fmt.upper()} saved to {path}")
         )
         dialog.exec()
+
+    def geolocation_summary(self) -> Dict[str, Any]:
+        """What the Evidence Board currently concludes, for reports and logging."""
+        return self.geolocate.report_data()
 
     def show_custody(self) -> None:
         CustodyDialog(self).exec()
@@ -724,7 +782,9 @@ class MainWindow(QMainWindow):
 
     def _refresh_theme_dependent_widgets(self) -> None:
         colours = theme.palette()
-        for index, name in enumerate(("open-file", "report", "shield", "web", "timeline")):
+        for index, name in enumerate(
+            ("open-file", "report", "shield", "web", "timeline", "pin")
+        ):
             self.tabs.setTabIcon(index, icon(name, colours["icon"]))
         for action, name in (
             (self.act_open_files, "open-file"), (self.act_open_folder, "open-folder"),
@@ -733,7 +793,8 @@ class MainWindow(QMainWindow):
             (self.act_strip, "strip"), (self.act_report, "report"),
             (self.act_settings, "settings"), (self.act_custody, "custody"),
             (self.act_cancel, "cancel"), (self.act_reanalyze, "refresh"),
-            (self.act_forensics_selected, "shield"),
+            (self.act_forensics_selected, "shield"), (self.act_geolocate, "pin"),
+            (self.act_measure_shadow, "analyze"),
             (self.act_open_maps, "map"),
         ):
             action.setIcon(icon(name, colours["icon"]))
@@ -816,6 +877,8 @@ class MainWindow(QMainWindow):
         self.act_clear.setEnabled(has_images)
         self.act_report.setEnabled(analysed)
         self.act_report_selected.setEnabled(selected > 0)
+        self.act_geolocate.setEnabled(bool(self._current_path))
+        self.act_measure_shadow.setEnabled(bool(self._current_path))
 
     def status_message(self, text: str) -> None:
         self.status_label.setText(text)

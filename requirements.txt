@@ -5,6 +5,8 @@ requests>=2.25.0
 folium>=0.12.0
 piexif>=1.1.3
 Jinja2>=3.0
+numpy>=1.21
+timezonefinder>=6.0
 
 # Desktop application (optional for the CLI)
 PySide6>=6.5

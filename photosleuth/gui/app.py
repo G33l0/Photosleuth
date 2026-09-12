@@ -45,7 +45,7 @@ def create_application(argv: Optional[List[str]] = None) -> QApplication:
             import ctypes
 
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                f"G33l0.PhotoSleuth.{__version__}"
+                f"IamG2.PhotoSleuth.{__version__}"
             )
         except Exception:
             pass

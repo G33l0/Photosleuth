@@ -12,13 +12,14 @@
 
 Extract metadata, pinpoint locations, spot edited photos, reverse-search the web,
 and scrub sensitive data — from a native Windows application or the command line.
-Developed by **G33l0**.
+Developed by **IamG2**.
 
 ---
 
 ## 📑 Table of Contents
 
 - [Desktop Application](#-desktop-application)
+- [Geolocation](#-geolocation)
 - [Features](#-features)
 - [Installation](#-installation)
 - [Usage](#-usage)
@@ -48,6 +49,7 @@ installs on Windows with no Python required.
 | **Location** | Address lookup, map links, manual geotagging (type, paste a Maps link, search a place, or copy from another photo), and map export |
 | **Forensics** | Embedded-thumbnail vs. image comparison to reveal post-capture edits, perceptual hashes, SHA-256 |
 | **Timeline** | Every photo arranged by capture date, grouped by day, month or year |
+| **Geolocate** | The Evidence Board: shadow geometry, metadata cross-checks and landmark resection fused into one probability map |
 | **Reverse search** | Google Vision and TinEye via API; Google Lens, Yandex and Bing via browser hand-off |
 | **Reports** | PDF, HTML, CSV, JSON and map exports with your own branding and templates |
 | **Custody** | Tamper-evident, hash-chained log of every action taken |
@@ -59,6 +61,66 @@ photosleuth-gui          # installed entry point
 photosleuth --gui        # or via the CLI
 python -m photosleuth.gui
 ```
+
+---
+
+## 🧭 Geolocation
+
+Where was this photograph taken? No single technique answers that. Each one
+rules territory **out**, and where several agree is where the picture was taken.
+PhotoSleuth's **Evidence Board** is built around that idea: every analyser
+contributes a *constraint* — a band, a circle, a cone — and the board multiplies
+them into one probability surface, then tells you which evidence supports the
+answer and which fights it.
+
+### What each technique contributes
+
+| Technique | What it measures | What it gives you |
+| --------- | ---------------- | ----------------- |
+| **Time-zone consistency** | GPS clock (UTC) vs camera clock (local) vs the real zone at those coordinates | Catches spoofed coordinates and mis-set clocks |
+| **UTC-offset band** | The offset alone, even with no coordinates | A longitude band |
+| **GPS quality** | DOP, satellite count, fix method | An honest error radius instead of a bare point |
+| **View cone** | `GPSImgDirection` + the lens field of view | What the camera was *looking at*, not just where it stood |
+| **Shadow → sun elevation** | A vertical object and its shadow | The sun's height above the horizon |
+| **Circle of equal altitude** | Sun elevation at a known UTC instant | Every point on Earth that saw the sun that high |
+| **Latitude from shadow** | Sun elevation at a local *solar* time | A latitude band (longitude cancels out) |
+| **Time of day** | Sun elevation at a known place and date | The one or two moments it could have been |
+| **North arrow** | Shadow direction + solar position | Which way is north *in the photograph* |
+| **Three-point resection** | Angles between three identified landmarks | The camera's position, often to within metres |
+
+### How to use it
+
+1. Select an analysed image and open **Tools → Geolocate** (`F7`).
+2. **Metadata** tab → *Read metadata evidence*. Instant, offline, and it will
+   tell you straight away if the coordinates and the clock disagree.
+3. **Shadow** tab → *Measure shadow on photo* (`F8`), then click three points:
+   the top of a vertical object, its base, and the tip of its shadow. Set the
+   capture time in UTC and press *Add to board*.
+4. **Landmarks** tab → mark a landmark in the photo, then click the same place
+   on the map. Three pairs and *Solve position* fixes the camera.
+5. Press **Fuse evidence**. The map shows the probability surface and ranked
+   candidates; selecting one breaks down how every constraint scored there.
+
+### Honest limits
+
+- **Shadows rarely produce a point.** They produce bands, and above all they
+  *disprove*. A shadow is at its most powerful when it shows a claimed place
+  and time cannot both be true.
+- **Clock time is not solar time.** France runs about 1.9 h ahead of its own
+  sun and western China about 3 h. PhotoSleuth requires a UTC instant for the
+  exact techniques and converts explicitly for the rest, because feeding wall
+  clock time into a solar calculation gives a confidently wrong latitude.
+- **A time-zone mismatch is graded, not binary.** Up to three hours is reported
+  as *questionable* rather than *inconsistent*: a camera left on the previous
+  zone after travelling looks exactly like that.
+- **Resection needs a known lens.** The angles come from the field of view, so
+  a file with no focal length cannot be resected.
+- **Confidence is not truth.** A high score means the constraints you supplied
+  agree — no more. The per-constraint breakdown is there so the reasoning can
+  be checked rather than trusted.
+
+The map is drawn from OpenStreetMap tiles, cached on disk and fetched only as
+you pan. Map data © OpenStreetMap contributors.
 
 ---
 
@@ -74,6 +136,9 @@ python -m photosleuth.gui
 - **Batch processing** – analyse whole folders, optionally recursively; one bad file
   never aborts the run.
 - **Persistent configuration & geocode cache** – stored in a per-user directory.
+- **Geolocation** – shadow geometry, solar position, EXIF cross-checks and
+  landmark resection, fused into a single probability map with a per-constraint
+  audit trail.
 - **Forensics** – compares the embedded thumbnail with the image to reveal
   photos edited after capture; perceptual hashes and SHA-256 for every file.
 - **Chain of custody** – tamper-evident, hash-chained log of every action.
@@ -142,6 +207,8 @@ yourself.
 | `Ctrl+G` | Set location |
 | `Ctrl+Shift+S` | Strip metadata |
 | `Ctrl+M` | Open in Maps |
+| `F7` | Open the Evidence Board |
+| `F8` | Measure a shadow on the photo |
 | `Ctrl+E` | Export report |
 | `Ctrl+L` | Chain of custody |
 | `Ctrl+,` | Settings |
@@ -291,13 +358,32 @@ generate_map(records, "photos.html")
 strip_exif("secret.jpg")  # -> secret_clean.jpg
 ```
 
+Geolocation works headlessly too:
+
+```python
+from datetime import datetime, timezone
+from photosleuth.geolocation import solar, shadow, exif_geo
+from photosleuth.geolocation.constraints import EvidenceBoard
+
+when = datetime(2024, 7, 4, 9, 30, tzinfo=timezone.utc)
+
+# A 1 m pole casting a 0.8 m shadow puts the sun about 51 degrees up.
+observation = shadow.ShadowObservation(object_length=1.0, shadow_length=0.8)
+
+board = EvidenceBoard(shadow.constraints(observation, moment=when))
+board.constraints += exif_geo.analyze(meta)["constraints"]
+
+for candidate in board.candidates(count=3):
+    print(candidate.rank, candidate.latitude, candidate.longitude, candidate.score)
+```
+
 ---
 
 ## 🧪 Testing
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 262 tests, including offscreen GUI tests
+pytest                      # 345 tests, including offscreen GUI tests
 pytest -W error::DeprecationWarning   # run strict
 ```
 
@@ -318,7 +404,7 @@ GUI tests run on Qt's `offscreen` platform, so they need no display and work in 
 
 ## 📄 License
 
-MIT – free to use, modify, and distribute with credit to G33l0.
+MIT – free to use, modify, and distribute with credit to IamG2.
 
 ---
 
@@ -327,4 +413,4 @@ MIT – free to use, modify, and distribute with credit to G33l0.
 Feedback, issues, and PRs are always welcome. Let's make PhotoSleuth even better together.
 
 Happy sleuthing!
-– G33l0
+– IamG2

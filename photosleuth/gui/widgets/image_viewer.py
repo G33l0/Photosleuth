@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 from ...i18n import tr
 from .. import theme
 from ..resources import icon
+from .measure_overlay import MeasureMode, MeasureOverlay
 
 MIN_SCALE = 0.04
 MAX_SCALE = 24.0
@@ -33,12 +34,16 @@ class ImageCanvas(QGraphicsView):
     """A pannable, zoomable canvas holding one image."""
 
     scaleChanged = Signal(float)
+    measurementComplete = Signal(object)
+    landmarkPlaced = Signal(float, float)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._scene = QGraphicsScene(self)
         self.setScene(self._scene)
         self._item: Optional[QGraphicsPixmapItem] = None
+        self._overlay: Optional[MeasureOverlay] = None
+        self._measure_mode = MeasureMode.NONE
         self._fit = True
         self._rotation = 0
 
@@ -74,12 +79,43 @@ class ImageCanvas(QGraphicsView):
         self._item = self._scene.addPixmap(pixmap)
         self._item.setTransformationMode(Qt.SmoothTransformation)
         self._scene.setSceneRect(QRectF(pixmap.rect()))
+
+        self._overlay = MeasureOverlay(pixmap.width(), pixmap.height())
+        self._scene.addItem(self._overlay)
+        self._overlay.measurementComplete.connect(self.measurementComplete)
+        self._overlay.landmarkPlaced.connect(self.landmarkPlaced)
+        self._overlay.set_mode(self._measure_mode)
+
         self.fit()
         return True
 
     def clear(self) -> None:
         self._scene.clear()
         self._item = None
+        self._overlay = None
+
+    # -- measuring ---------------------------------------------------------
+    def set_measure_mode(self, mode: MeasureMode) -> None:
+        """Switch between panning the image and drawing on it."""
+        self._measure_mode = mode
+        measuring = mode is not MeasureMode.NONE
+        # Drag-to-pan would swallow the clicks the overlay needs.
+        self.setDragMode(QGraphicsView.NoDrag if measuring else QGraphicsView.ScrollHandDrag)
+        self.setCursor(Qt.CrossCursor if measuring else Qt.ArrowCursor)
+        if self._overlay is not None:
+            self._overlay.set_mode(mode)
+
+    @property
+    def measure_mode(self) -> MeasureMode:
+        return self._measure_mode
+
+    def clear_measurements(self) -> None:
+        if self._overlay is not None:
+            self._overlay.clear()
+
+    def undo_measurement(self) -> None:
+        if self._overlay is not None:
+            self._overlay.undo()
 
     @property
     def has_image(self) -> bool:
@@ -145,6 +181,9 @@ class ImageCanvas(QGraphicsView):
             self.scaleChanged.emit(self.current_scale())
 
     def mouseDoubleClickEvent(self, event) -> None:
+        if self._measure_mode is not MeasureMode.NONE:
+            event.ignore()
+            return
         self.actual_size() if self._fit else self.fit()
         event.accept()
 
@@ -152,9 +191,14 @@ class ImageCanvas(QGraphicsView):
 class ImageViewer(QWidget):
     """Canvas plus a compact zoom toolbar and caption."""
 
+    measurementComplete = Signal(object)
+    landmarkPlaced = Signal(float, float)
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.canvas = ImageCanvas(self)
+        self.canvas.measurementComplete.connect(self.measurementComplete)
+        self.canvas.landmarkPlaced.connect(self.landmarkPlaced)
         self._path: Optional[str] = None
 
         colours = theme.palette()
@@ -193,6 +237,27 @@ class ImageViewer(QWidget):
         layout.addWidget(self.canvas, 1)
 
         self.canvas.scaleChanged.connect(self._update_zoom_label)
+        self._measure_hint = QLabel("", self)
+        self._measure_hint.setStyleSheet(
+            f"color: {colours['accent']}; padding: 3px 8px;"
+        )
+        self._measure_hint.hide()
+        layout.insertWidget(1, self._measure_hint)
+
+    def set_measure_mode(self, mode) -> None:
+        """Put the viewer into a measuring mode and explain what to click."""
+        self.canvas.set_measure_mode(mode)
+        hints = {
+            MeasureMode.SHADOW: "Click three points: top of the object, its base, "
+                                "then the tip of the shadow.",
+            MeasureMode.LANDMARK: "Click a landmark in the photo, then click the same "
+                                  "place on the map.",
+            MeasureMode.LINE: "Click two points to measure a distance in pixels.",
+            MeasureMode.ANGLE: "Click the vertex, then the two directions.",
+        }
+        text = hints.get(mode, "")
+        self._measure_hint.setText(text)
+        self._measure_hint.setVisible(bool(text))
 
     def show_image(self, path, caption: str = "") -> bool:
         ok = self.canvas.load(path)

@@ -61,10 +61,13 @@ def test_selecting_populates_every_tab(loaded, pump, image_ne):
 
 
 def test_every_tab_renders(loaded, pump):
+    """Visit every tab; none may raise, whatever the tab set has grown to."""
+    titles = [loaded.tabs.tabText(i) for i in range(loaded.tabs.count())]
     for index in range(loaded.tabs.count()):
         loaded.tabs.setCurrentIndex(index)
         pump()
-    assert loaded.tabs.count() == 5
+    for expected in ("Details", "Metadata", "Forensics", "Timeline", "Geolocate"):
+        assert expected in titles
 
 
 def test_filtering_updates_the_counter(loaded, pump):

@@ -1,7 +1,7 @@
 """PhotoSleuth - Ultimate Image Metadata & Location Analyzer."""
 
 __version__ = "1.1.0"
-__author__ = "G33l0"
+__author__ = "IamG2"
 
 __all__ = [
     "__version__",

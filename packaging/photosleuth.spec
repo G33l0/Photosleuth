@@ -29,9 +29,12 @@ datas = [
 # folium ships its Jinja templates and JS as package data.
 datas += collect_data_files("folium")
 datas += collect_data_files("branca")
+# timezonefinder ships binary boundary data the geolocation checks depend on.
+datas += collect_data_files("timezonefinder")
 
 hiddenimports = [
     "photosleuth.gui",
+    "photosleuth.geolocation",
     "photosleuth.gui.app",
     "photosleuth.gui.main_window",
     "photosleuth.integration",

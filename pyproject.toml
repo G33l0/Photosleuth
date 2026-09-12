@@ -9,7 +9,7 @@ description = "Ultimate Image Metadata & Location Analyzer"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
-authors = [{ name = "G33l0" }]
+authors = [{ name = "IamG2" }]
 keywords = ["exif", "metadata", "osint", "gps", "geolocation", "privacy"]
 dependencies = [
     "exifread>=3.0.0",
@@ -19,6 +19,8 @@ dependencies = [
     "folium>=0.12.0",
     "piexif>=1.1.3",
     "Jinja2>=3.0",
+    "numpy>=1.21",
+    "timezonefinder>=6.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

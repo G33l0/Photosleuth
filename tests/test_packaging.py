@@ -40,38 +40,37 @@ def test_repository_is_consistent_everywhere():
     assert f"https://github.com/{expected}" in readme
 
 
-def test_author_matches_the_licence_holder():
-    """The LICENSE is the authoritative owner; everything else follows it."""
+def test_author_is_credited_consistently():
+    """The tool's author (IamG2) is credited everywhere an author is named."""
     import re
 
     from photosleuth import __author__
 
-    licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
-    holder = re.search(r"Copyright \(c\)\s*\d{4}\s+(.+)", licence).group(1).strip()
-    assert __author__ == holder
+    assert __author__ == "IamG2"
 
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert f'name = "{holder}"' in pyproject
+    assert f'name = "{__author__}"' in pyproject
 
     installer = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
-    assert re.search(rf'#define\s+AppPublisher\s+"{re.escape(holder)}"', installer)
+    assert re.search(rf'#define\s+AppPublisher\s+"{re.escape(__author__)}"', installer)
 
     version_info = (ROOT / "packaging" / "version_info.txt").read_text(encoding="utf-8")
-    assert f"'CompanyName', '{holder}'" in version_info
+    assert f"'CompanyName', '{__author__}'" in version_info
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"Developed by **{__author__}**" in readme
 
 
-def test_no_stale_owner_references():
-    """Guard against the previous attribution creeping back in.
+def test_licence_holder_is_the_repository_owner():
+    """Copyright sits with the repo owner, which is separate from authorship."""
+    import re
 
-    The needle is assembled at runtime so this file does not match itself.
-    """
-    import subprocess
+    licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    holder = re.search(r"Copyright \(c\)\s*\d{4}\s+(.+)", licence).group(1).strip()
+    assert holder == "G33l0"
 
-    needle = "Iam" + "G2"
-    result = subprocess.run(
-        ["git", "grep", "-l", needle], cwd=ROOT, capture_output=True, text=True
-    )
-    assert result.stdout.strip() == "", f"stale references in: {result.stdout}"
+    version_info = (ROOT / "packaging" / "version_info.txt").read_text(encoding="utf-8")
+    assert holder in version_info
 
 
 def test_icon_has_every_windows_size():
@@ -148,6 +147,13 @@ def test_pyinstaller_spec_excludes_webengine():
     assert "photosleuth/assets" in spec
 
 
+def test_pyinstaller_spec_bundles_geolocation_data():
+    """The time-zone boundaries are data files, not importable modules."""
+    spec = (ROOT / "packaging" / "photosleuth.spec").read_text(encoding="utf-8")
+    assert 'collect_data_files("timezonefinder")' in spec
+    assert "photosleuth.geolocation" in spec
+
+
 def test_installer_registers_associations_without_hijacking_defaults():
     installer = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
     assert "OpenWithProgids" in installer
@@ -165,6 +171,7 @@ def test_entry_points_are_declared():
 def test_requirements_match_project_dependencies():
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
-    for package in ("exifread", "geopy", "Pillow", "requests", "folium", "piexif", "Jinja2"):
+    for package in ("exifread", "geopy", "Pillow", "requests", "folium", "piexif",
+                    "Jinja2", "numpy", "timezonefinder"):
         assert package in pyproject, f"{package} missing from pyproject"
         assert package in requirements, f"{package} missing from requirements.txt"

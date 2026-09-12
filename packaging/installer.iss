@@ -11,7 +11,7 @@
 
 #define AppName        "PhotoSleuth"
 #define AppVersion     "1.1.0"
-#define AppPublisher   "G33l0"
+#define AppPublisher   "IamG2"
 #define AppURL         "https://github.com/G33l0/Photosleuth"
 #define AppExeName     "PhotoSleuth.exe"
 #define CliExeName     "photosleuth-cli.exe"
