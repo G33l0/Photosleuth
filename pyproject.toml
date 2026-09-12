@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "photosleuth"
+version = "1.1.0"
+description = "Ultimate Image Metadata & Location Analyzer"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "G33l0" }]
+keywords = ["exif", "metadata", "osint", "gps", "geolocation", "privacy"]
+dependencies = [
+    "exifread>=3.0.0",
+    "geopy>=2.2.0",
+    "Pillow>=9.0.0",
+    "requests>=2.25.0",
+    "folium>=0.12.0",
+    "piexif>=1.1.3",
+    "Jinja2>=3.0",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Security",
+]
+
+[project.urls]
+Homepage = "https://github.com/G33l0/Photosleuth"
+Issues = "https://github.com/G33l0/Photosleuth/issues"
+
+[project.scripts]
+photosleuth = "photosleuth.cli:run"
+
+[project.gui-scripts]
+photosleuth-gui = "photosleuth.gui.app:main"
+
+[project.optional-dependencies]
+gui = ["PySide6>=6.5"]
+dev = ["pytest>=7.0", "pytest-qt>=4.2", "PySide6>=6.5"]
+build = ["pyinstaller>=6.0", "PySide6>=6.5"]
+
+[tool.setuptools.packages.find]
+include = ["photosleuth*"]
+
+[tool.setuptools.package-data]
+photosleuth = [
+    "assets/*.png", "assets/*.ico", "assets/*.svg", "assets/*.bmp",
+    "assets/i18n/*.json", "assets/templates/*.html",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

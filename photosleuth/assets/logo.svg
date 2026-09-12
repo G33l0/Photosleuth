@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PhotoSleuth">
+  <defs>
+    <linearGradient id="plate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a2344"/><stop offset="100%" stop-color="#0c1126"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="lensClip"><circle cx="223" cy="212" r="113"/></clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="113" fill="url(#plate)"/>
+  <rect width="512" height="512" rx="113" fill="url(#sheen)"/>
+
+  <line x1="305" y1="294" x2="396" y2="385" stroke="#ffffff" stroke-width="37" stroke-linecap="round"/>
+  <circle cx="223" cy="212" r="113" fill="#0c1126"/>
+
+  <g clip-path="url(#lensClip)">
+    <g transform="translate(223 212)">
+      <path d="M0 0 L-46.5 -80.54 A93.0 93.0 0 0 1 46.5 -80.54 Z" fill="#38d6e0"/>
+      <path d="M0 0 L46.5 -80.54 A93.0 93.0 0 0 1 93.0 0.0 Z" fill="#31c6d6"/>
+      <path d="M0 0 L93.0 0.0 A93.0 93.0 0 0 1 46.5 80.54 Z" fill="#2ab5cc"/>
+      <path d="M0 0 L46.5 80.54 A93.0 93.0 0 0 1 -46.5 80.54 Z" fill="#24a7c1"/>
+      <path d="M0 0 L-46.5 80.54 A93.0 93.0 0 0 1 -93.0 0.0 Z" fill="#1d9db8"/>
+      <path d="M0 0 L-93.0 0.0 A93.0 93.0 0 0 1 -46.5 -80.54 Z" fill="#1694b2"/>
+      <line x1="0" y1="0" x2="-46.5" y2="-80.54" stroke="#0c1126" stroke-opacity="0.45" stroke-width="3.2"/>
+      <line x1="0" y1="0" x2="46.5" y2="-80.54" stroke="#0c1126" stroke-opacity="0.45" stroke-width="3.2"/>
+      <line x1="0" y1="0" x2="93.0" y2="0.0" stroke="#0c1126" stroke-opacity="0.45" stroke-width="3.2"/>
+      <line x1="0" y1="0" x2="46.5" y2="80.54" stroke="#0c1126" stroke-opacity="0.45" stroke-width="3.2"/>
+      <line x1="0" y1="0" x2="-46.5" y2="80.54" stroke="#0c1126" stroke-opacity="0.45" stroke-width="3.2"/>
+      <line x1="0" y1="0" x2="-93.0" y2="0.0" stroke="#0c1126" stroke-opacity="0.45" stroke-width="3.2"/>
+      <polygon points="-21.39,-37.05 21.39,-37.05 42.78,0.0 21.39,37.05 -21.39,37.05 -42.78,0.0" fill="#0c1126"/>
+      <g>
+        <circle cx="0" cy="-12" r="25" fill="#ffb03e"/>
+        <path d="M-20 2 L20 2 L0 40 Z" fill="#ffb03e"/>
+        <circle cx="0" cy="-12" r="9.5" fill="#0c1126"/>
+      </g>
+    </g>
+    <ellipse cx="180" cy="168" rx="54" ry="38" fill="#ffffff" opacity="0.18"
+             transform="rotate(-32 180 168)"/>
+  </g>
+
+  <circle cx="223" cy="212" r="113" fill="none" stroke="#ffffff" stroke-width="32"/>
+</svg>

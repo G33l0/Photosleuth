@@ -1,17 +1,8 @@
+"""Setup script kept for legacy `python setup.py` workflows.
 
----
+Project metadata lives in pyproject.toml; this file only forwards to it.
+"""
 
-### `setup.py` (optional, for pip install)
-```python
-from setuptools import setup, find_packages
+from setuptools import setup
 
-setup(
-    name="photosleuth",
-    version="1.0.0",
-    author="IamG2",
-    description="Ultimate Image Metadata & Location Analyzer",
-    packages=find_packages(),
-    install_requires=["exifread>=2.3.0", "geopy>=2.2.0"],
-    entry_points={"console_scripts": ["photosleuth=photosleuth.cli:main"]},
-    classifiers=["Programming Language :: Python :: 3"],
-)
+setup()
