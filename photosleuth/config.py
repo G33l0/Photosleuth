@@ -59,7 +59,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     },
     "updates": {
         "check_on_startup": False,
-        "repository": "g33l0/photosleuth",
+        "repository": "G33l0/Photosleuth",
         "last_check": "",
     },
     "reports": {

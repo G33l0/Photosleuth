@@ -9,7 +9,7 @@ description = "Ultimate Image Metadata & Location Analyzer"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
-authors = [{ name = "IamG2" }]
+authors = [{ name = "G33l0" }]
 keywords = ["exif", "metadata", "osint", "gps", "geolocation", "privacy"]
 dependencies = [
     "exifread>=3.0.0",
@@ -37,8 +37,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/g33l0/photosleuth"
-Issues = "https://github.com/g33l0/photosleuth/issues"
+Homepage = "https://github.com/G33l0/Photosleuth"
+Issues = "https://github.com/G33l0/Photosleuth/issues"
 
 [project.scripts]
 photosleuth = "photosleuth.cli:run"

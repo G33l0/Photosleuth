@@ -6,13 +6,13 @@
 
 <p align="center"><b>Image metadata, location and forensics toolkit — desktop app and CLI.</b></p>
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/g33l0/photosleuth)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/G33l0/Photosleuth)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
 Extract metadata, pinpoint locations, spot edited photos, reverse-search the web,
 and scrub sensitive data — from a native Windows application or the command line.
-Developed by **IamG2**.
+Developed by **G33l0**.
 
 ---
 
@@ -88,7 +88,7 @@ python -m photosleuth.gui
 
 1. **Clone** the repository:
    ```bash
-   git clone https://github.com/g33l0/photosleuth.git
+   git clone https://github.com/G33l0/Photosleuth.git
    cd photosleuth
    ```
 
@@ -104,7 +104,7 @@ python -m photosleuth.gui
    ```
 
 **Windows users:** grab the installer from the
-[Releases page](https://github.com/g33l0/photosleuth/releases) instead — it
+[Releases page](https://github.com/G33l0/Photosleuth/releases) instead — it
 needs no Python at all. See
 [Building the Windows Installer](#-building-the-windows-installer) to build it
 yourself.
@@ -318,7 +318,7 @@ GUI tests run on Qt's `offscreen` platform, so they need no display and work in 
 
 ## 📄 License
 
-MIT – free to use, modify, and distribute with credit to IamG2.
+MIT – free to use, modify, and distribute with credit to G33l0.
 
 ---
 
@@ -327,4 +327,4 @@ MIT – free to use, modify, and distribute with credit to IamG2.
 Feedback, issues, and PRs are always welcome. Let's make PhotoSleuth even better together.
 
 Happy sleuthing!
-– IamG2
+– G33l0

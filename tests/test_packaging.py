@@ -22,6 +22,58 @@ def test_version_is_consistent_everywhere():
     assert f"'{__version__}'" in version_info
 
 
+def test_repository_is_consistent_everywhere():
+    """Every file that names the project repo must agree on owner/name."""
+    from photosleuth import config, updates
+
+    expected = "G33l0/Photosleuth"
+    assert updates.DEFAULT_REPO == expected
+    assert config.DEFAULT_CONFIG["updates"]["repository"] == expected
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert f"https://github.com/{expected}" in pyproject
+
+    installer = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
+    assert f"https://github.com/{expected}" in installer
+
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert f"https://github.com/{expected}" in readme
+
+
+def test_author_matches_the_licence_holder():
+    """The LICENSE is the authoritative owner; everything else follows it."""
+    import re
+
+    from photosleuth import __author__
+
+    licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    holder = re.search(r"Copyright \(c\)\s*\d{4}\s+(.+)", licence).group(1).strip()
+    assert __author__ == holder
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert f'name = "{holder}"' in pyproject
+
+    installer = (ROOT / "packaging" / "installer.iss").read_text(encoding="utf-8")
+    assert re.search(rf'#define\s+AppPublisher\s+"{re.escape(holder)}"', installer)
+
+    version_info = (ROOT / "packaging" / "version_info.txt").read_text(encoding="utf-8")
+    assert f"'CompanyName', '{holder}'" in version_info
+
+
+def test_no_stale_owner_references():
+    """Guard against the previous attribution creeping back in.
+
+    The needle is assembled at runtime so this file does not match itself.
+    """
+    import subprocess
+
+    needle = "Iam" + "G2"
+    result = subprocess.run(
+        ["git", "grep", "-l", needle], cwd=ROOT, capture_output=True, text=True
+    )
+    assert result.stdout.strip() == "", f"stale references in: {result.stdout}"
+
+
 def test_icon_has_every_windows_size():
     from PIL import Image
 

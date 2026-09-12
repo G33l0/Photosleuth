@@ -10,7 +10,7 @@ from . import __version__
 from .config import load_config
 
 RELEASES_API = "https://api.github.com/repos/{repo}/releases/latest"
-DEFAULT_REPO = "g33l0/photosleuth"
+DEFAULT_REPO = "G33l0/Photosleuth"
 
 
 @dataclass

@@ -365,7 +365,7 @@ class SettingsDialog(QDialog):
         self.include_custody.setChecked(bool(reports.get("include_custody", False)))
 
         self.check_updates.setChecked(bool(updates.get("check_on_startup", False)))
-        self.update_repo.setText(updates.get("repository", "g33l0/photosleuth"))
+        self.update_repo.setText(updates.get("repository", "G33l0/Photosleuth"))
 
     def _refresh_templates(self) -> None:
         from ...reports import available_templates
@@ -434,7 +434,7 @@ class SettingsDialog(QDialog):
             },
             "updates": {
                 "check_on_startup": self.check_updates.isChecked(),
-                "repository": self.update_repo.text().strip() or "g33l0/photosleuth",
+                "repository": self.update_repo.text().strip() or "G33l0/Photosleuth",
             },
         }
 
