@@ -87,6 +87,7 @@ MAP_PAGE = """<!doctype html>
   body { font-family: "Segoe UI", Helvetica, Arial, sans-serif; }
   .ps-popup b { font-size: 13px; }
   .ps-popup .muted { color: #5f6f83; }
+  .ps-pin { background: none; border: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
   .ps-offline { position: absolute; z-index: 1000; top: 8px; left: 50%;
                 transform: translateX(-50%); background: #fff0d2; color: #8a5a00;
                 padding: 6px 12px; border-radius: 4px; font-size: 12px;
@@ -100,6 +101,22 @@ MAP_PAGE = """<!doctype html>
 <script>__JS__</script>
 <script>
   var points = __POINTS__;
+
+  // Leaflet's default marker is a PNG loaded from an images/ folder beside its
+  // stylesheet. With the CSS inlined there is no such folder, so the markers
+  // would render as broken images. An inline SVG divIcon needs no files at all
+  // and therefore works from any location, online or off.
+  var pin = L.divIcon({
+    className: 'ps-pin',
+    iconSize: [26, 36],
+    iconAnchor: [13, 35],
+    popupAnchor: [0, -32],
+    html: '<svg width="26" height="36" viewBox="0 0 26 36" xmlns="http://www.w3.org/2000/svg">'
+        + '<path d="M13 35C13 35 24 21.5 24 13A11 11 0 1 0 2 13c0 8.5 11 22 11 22z" '
+        + 'fill="#1694b2" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>'
+        + '<circle cx="13" cy="13" r="4.4" fill="#ffffff"/></svg>'
+  });
+
   var map = L.map('map');
   var tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
@@ -113,7 +130,8 @@ MAP_PAGE = """<!doctype html>
   var bounds = [];
   points.forEach(function (p) {
     bounds.push([p.lat, p.lon]);
-    L.marker([p.lat, p.lon]).addTo(map).bindPopup(p.html, { maxWidth: 320 })
+    L.marker([p.lat, p.lon], { icon: pin, title: p.name }).addTo(map)
+     .bindPopup(p.html, { maxWidth: 320 })
      .bindTooltip(p.name);
   });
   if (bounds.length === 1) { map.setView(bounds[0], 15); }

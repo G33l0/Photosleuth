@@ -381,24 +381,27 @@ The installer offers optional Explorer integration, "Open with" registration
 (it never hijacks your default image viewer) and adding the CLI to `PATH`. It
 installs per-user by default, so no administrator prompt appears.
 
-Expect roughly **220 MB installed** and an installer around **80–90 MB**. Qt
-(119 MB) and NumPy (41 MB) are the bulk and both are load-bearing: Qt is the
-interface, NumPy is the geolocation fusion engine. Measured on Linux; a Windows
-build is slightly smaller because the GTK and X11 libraries are not needed.
-Pass `-SkipInstaller` to build only the application folder.
+Expect roughly **275 MB installed** and an installer around **95–105 MB**.
+Qt (119 MB), NumPy (41 MB) and the time-zone boundary data (32 MB) are the
+bulk, and all three are load-bearing. Measured on Linux; a Windows build is
+slightly smaller because the GTK and X11 libraries are not needed. Pass
+`-SkipInstaller` to build only the application folder.
 
-Three things keep it from being larger than that:
+**On making it smaller.** Three reductions were tried. Only one was kept:
 
-- **The time-zone check ships a 43 KB raster, not a 32 MB library.**
-  `timezonefinder`'s boundary polygons are baked down to a quarter-degree grid
-  by `tools/build_timezone_raster.py`. It agrees with the full library on 98.9%
-  of random points, and *every* disagreement is flagged as near-a-border rather
-  than reported as fact.
-- **Maps use a vendored Leaflet (160 KB), not the folium stack**, which also
-  makes exported maps work offline.
-- **Unused Qt libraries are dropped from the bundle.** Excluding a PySide6
-  module does not remove the Qt library behind it, so the QML, Quick and PDF
-  stacks are filtered out explicitly — about 20 MB.
+| Attempt | Saved | Kept? |
+| ------- | ----- | ----- |
+| Replace the folium stack with a vendored Leaflet | ~4 MB | **Yes** — also makes exported maps work offline |
+| Bake the time-zone boundaries into a 43 KB raster | 32 MB | **No** — 98.9% accurate is not accurate enough for a forensic check |
+| Filter unused Qt libraries out of the bundle | ~20 MB | **No** — verifiable on Linux only, and this ships on Windows |
+
+The raster still ships, at 43 KB, as a fallback for a `pip install` without
+`timezonefinder`. When the real boundary data is present it is always used, and
+when the fallback answers it flags any point near a boundary rather than
+asserting a zone it cannot be sure of.
+
+This is the deliberate trade: **a forensic tool should be correct before it is
+small.**
 
 **Portable mode:** drop an empty file named `portable.txt` next to
 `PhotoSleuth.exe` and all settings, caches and logs live in a `PhotoSleuthData`
@@ -451,7 +454,7 @@ for candidate in board.candidates(count=3):
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 420 tests, including offscreen GUI tests
+pytest                      # 422 tests, including offscreen GUI tests
 pytest -W error::DeprecationWarning   # run strict
 ```
 

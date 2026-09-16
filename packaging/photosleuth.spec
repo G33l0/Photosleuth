@@ -27,9 +27,10 @@ datas = [
     (str(PACKAGE / "assets"), "photosleuth/assets"),
 ]
 # Leaflet is vendored under assets/vendor, so no folium/branca/xyzservices.
-# timezonefinder is deliberately NOT bundled: its 32 MB of boundary polygons is
-# replaced by the 43 KB raster in assets/timezones.bin, built by
-# tools/build_timezone_raster.py.
+# timezonefinder's boundary data is bundled in full. A coarse raster was tried
+# and rejected: it agreed with the real polygons on 98.9% of points, and a
+# forensic check that is occasionally less certain is not worth 32 MB.
+datas += collect_data_files("timezonefinder")
 
 hiddenimports = [
     "photosleuth.gui",
@@ -47,7 +48,6 @@ hiddenimports += collect_submodules("photosleuth")
 excludes = [
     "tkinter", "matplotlib", "numpy.distutils", "pytest", "setuptools",
     "cryptography", "OpenSSL", "oauthlib", "jwt", "IPython", "notebook",
-    "timezonefinder", "timezonefinder_data", "h3",
     "folium", "branca", "xyzservices",
     "PySide6.Qt3DCore", "PySide6.Qt3DRender", "PySide6.Qt3DInput",
     "PySide6.Qt3DLogic", "PySide6.Qt3DAnimation", "PySide6.Qt3DExtras",
@@ -56,12 +56,11 @@ excludes = [
     "PySide6.QtNfc", "PySide6.QtPositioning", "PySide6.QtSensors",
     "PySide6.QtSerialPort", "PySide6.QtTest", "PySide6.QtSql", "PySide6.QtDesigner",
     "PySide6.QtHelp", "PySide6.QtUiTools", "PySide6.QtScxml", "PySide6.QtSpatialAudio",
-    "PySide6.QtTextToSpeech", "PySide6.QtRemoteObjects", "PySide6.QtQuick",
-    "PySide6.QtQuickWidgets", "PySide6.QtQml",
+    "PySide6.QtTextToSpeech", "PySide6.QtRemoteObjects",
     # Map PNGs are rendered from OpenStreetMap tiles with Pillow, so the
     # WebEngine stack (~400 MB) is not needed.
     "PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineQuick",
-    "PySide6.QtWebChannel", "PySide6.QtWebSockets", "PySide6.QtPdf", "PySide6.QtPdfWidgets",
+    "PySide6.QtWebChannel", "PySide6.QtWebSockets",
 ]
 
 block_cipher = None
@@ -82,29 +81,11 @@ a = Analysis(
     noarchive=False,
 )
 
-# Excluding a PySide6 Python module does not stop PyInstaller bundling the Qt
-# shared library behind it, because Qt6Core links them. These are the QML/Quick
-# and PDF stacks, which a widgets-only application never loads; dropping them
-# saves about 20 MB. The frozen build is smoke-tested in CI to catch any that
-# turn out to be needed after all.
-UNUSED_QT_LIBRARIES = (
-    "libQt6Quick", "libQt6Qml", "libQt6QmlModels", "libQt6QmlWorkerScript",
-    "libQt6QuickParticles", "libQt6QuickShapes", "libQt6QuickTest",
-    "libQt6Pdf", "libQt6Designer", "libQt6Test", "libQt6Sql",
-    "libQt6VirtualKeyboard", "libQt6Charts", "libQt6DataVisualization",
-    "Qt6Quick", "Qt6Qml", "Qt6Pdf",
-)
-
-
-def _is_unused(entry) -> bool:
-    name = Path(entry[0]).name
-    return any(name.startswith(prefix) for prefix in UNUSED_QT_LIBRARIES)
-
-
-_before = len(a.binaries)
-a.binaries = TOC([entry for entry in a.binaries if not _is_unused(entry)])
-print(f"Dropped {_before - len(a.binaries)} unused Qt libraries")
-
+# Qt shared libraries are left alone. Filtering the QML, Quick and PDF stacks
+# out saved about 20 MB and broke nothing that could be tested here - but it
+# could only be tested on Linux, and this application ships on Windows. A
+# 20 MB saving is not worth a failure mode that first appears on a user's
+# machine.
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(

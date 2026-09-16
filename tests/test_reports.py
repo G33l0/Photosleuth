@@ -62,6 +62,29 @@ def test_map_is_self_contained(tmp_path, records):
     assert "L.map" in html and "leaflet" in html.lower()
 
 
+def test_markers_need_no_image_files(tmp_path, records):
+    """Leaflet's default pin is a PNG from an images/ folder that is not there.
+
+    Inlining the stylesheet removes the base path Leaflet uses to find it, so
+    the default markers render as broken images. The map therefore draws its
+    own inline SVG pin instead.
+    """
+    html = generate_map(records, tmp_path / "map.html").read_text(encoding="utf-8")
+    assert "L.divIcon" in html
+    assert "<svg" in html
+    # The markers this page creates must carry the custom icon, not the default.
+    assert "icon: pin" in html
+
+
+def test_marker_icon_is_drawn_not_fetched(tmp_path, records):
+    """No marker image may be requested by the page's own markup."""
+    import re
+
+    html = generate_map(records, tmp_path / "map.html").read_text(encoding="utf-8")
+    page_script = html.split("var points =")[1]
+    assert not re.search(r"marker-icon|marker-shadow", page_script)
+
+
 def test_map_round_trips_through_the_reader(tmp_path, records):
     from photosleuth.reports import _records_from_map_html
 

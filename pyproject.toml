@@ -19,6 +19,7 @@ dependencies = [
     "piexif>=1.1.3",
     "Jinja2>=3.0",
     "numpy>=1.21",
+    "timezonefinder>=6.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -48,7 +49,7 @@ photosleuth-gui = "photosleuth.gui.app:main"
 
 [project.optional-dependencies]
 gui = ["PySide6>=6.5"]
-dev = ["pytest>=7.0", "pytest-qt>=4.2", "PySide6>=6.5", "timezonefinder>=6.0"]
+dev = ["pytest>=7.0", "pytest-qt>=4.2", "PySide6>=6.5"]
 build = ["pyinstaller>=6.0", "PySide6>=6.5"]
 
 [tool.setuptools.packages.find]

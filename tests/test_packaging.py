@@ -154,14 +154,17 @@ def test_pyinstaller_spec_excludes_webengine():
     assert "photosleuth/assets" in spec
 
 
-def test_spec_drops_unused_qt_libraries():
-    """Excluding a PySide6 module does not drop the Qt library behind it."""
+def test_qt_libraries_are_not_filtered():
+    """Qt shared libraries are left alone.
+
+    Filtering the QML, Quick and PDF stacks saved about 20 MB and passed every
+    check available on Linux, but the application ships on Windows where that
+    could not be verified. The saving was given back rather than risk a failure
+    that first appears on a user's machine.
+    """
     spec = (ROOT / "packaging" / "photosleuth.spec").read_text(encoding="utf-8")
-    assert "UNUSED_QT_LIBRARIES" in spec
-    for library in ("libQt6Quick", "libQt6Qml", "libQt6Pdf"):
-        assert library in spec
-    # QPdfWriter lives in QtGui, so PDF export must not need the Pdf module.
-    assert "PySide6.QtPdf" in spec
+    assert "UNUSED_QT_LIBRARIES" not in spec
+    assert "a.binaries = TOC(" not in spec
 
 
 def test_folium_is_not_a_dependency():
@@ -172,17 +175,19 @@ def test_folium_is_not_a_dependency():
     assert "folium" not in requirements
 
 
-def test_pyinstaller_spec_excludes_the_heavy_timezone_library():
-    """32 MB of boundary polygons is replaced by a 43 KB raster."""
+def test_timezone_boundaries_are_bundled():
+    """The precise boundary data ships; accuracy beats 32 MB here."""
     spec = (ROOT / "packaging" / "photosleuth.spec").read_text(encoding="utf-8")
-    assert '"timezonefinder"' in spec.split("excludes = [")[1].split("]")[0]
+    assert 'collect_data_files("timezonefinder")' in spec
+    assert '"timezonefinder"' not in spec.split("excludes = [")[1].split("]")[0]
     assert "photosleuth.geolocation" in spec
 
 
-def test_timezone_raster_ships_and_is_small():
+def test_timezone_raster_ships_as_a_fallback():
+    """Kept so a pip install without timezonefinder still answers, at 43 KB."""
     raster = ASSETS / "timezones.bin"
     assert raster.is_file()
-    assert raster.stat().st_size < 500_000, "the raster should stay well under a megabyte"
+    assert raster.stat().st_size < 500_000
 
 
 def test_installer_registers_associations_without_hijacking_defaults():
@@ -203,6 +208,6 @@ def test_requirements_match_project_dependencies():
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
     for package in ("exifread", "geopy", "Pillow", "requests", "piexif",
-                    "Jinja2", "numpy"):
+                    "Jinja2", "numpy", "timezonefinder"):
         assert package in pyproject, f"{package} missing from pyproject"
         assert package in requirements, f"{package} missing from requirements.txt"
