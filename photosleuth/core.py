@@ -188,6 +188,13 @@ def reverse_geocode(lat: float, lon: float, use_cache: bool = True) -> str:
         if cached:
             return cached
 
+    # Offline, a previously cached address is the best that can be offered -
+    # and asking the network anyway would just stall the whole batch.
+    from .connectivity import is_online
+
+    if not is_online():
+        return "Offline - address not looked up"
+
     geolocator, limiter = _get_geolocator()
     try:
         limiter.wait()

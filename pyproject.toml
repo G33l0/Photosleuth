@@ -16,11 +16,9 @@ dependencies = [
     "geopy>=2.2.0",
     "Pillow>=9.0.0",
     "requests>=2.25.0",
-    "folium>=0.12.0",
     "piexif>=1.1.3",
     "Jinja2>=3.0",
     "numpy>=1.21",
-    "timezonefinder>=6.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -50,7 +48,7 @@ photosleuth-gui = "photosleuth.gui.app:main"
 
 [project.optional-dependencies]
 gui = ["PySide6>=6.5"]
-dev = ["pytest>=7.0", "pytest-qt>=4.2", "PySide6>=6.5"]
+dev = ["pytest>=7.0", "pytest-qt>=4.2", "PySide6>=6.5", "timezonefinder>=6.0"]
 build = ["pyinstaller>=6.0", "PySide6>=6.5"]
 
 [tool.setuptools.packages.find]
@@ -60,6 +58,8 @@ include = ["photosleuth*"]
 photosleuth = [
     "assets/*.png", "assets/*.ico", "assets/*.svg", "assets/*.bmp",
     "assets/i18n/*.json", "assets/templates/*.html",
+    "assets/vendor/*.js", "assets/vendor/*.css",
+    "assets/timezones.bin",
 ]
 
 [tool.pytest.ini_options]

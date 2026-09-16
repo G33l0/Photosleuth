@@ -62,6 +62,7 @@ def pixel_to_deg(x: float, y: float, zoom: int) -> Tuple[float, float]:
 class _TileSignals(QObject):
     ready = Signal(str, QImage)
     failed = Signal(str)
+    offline = Signal(str)
 
 
 class _TileJob(QRunnable):
@@ -93,6 +94,15 @@ class _TileJob(QRunnable):
             if not image.isNull():
                 self._emit(self.signals.ready, self.key, image)
                 return
+
+        # A disk miss is as far as this goes without a connection. The job
+        # still ran, so tiles saved on a previous session keep working.
+        from ...connectivity import is_online
+
+        if not is_online():
+            self._emit(self.signals.offline, self.key)
+            return
+
         try:
             import requests
 
@@ -138,18 +148,28 @@ class TileCache(QObject):
         self.memory_limit = memory_limit
         self.pending: set = set()
         self.failed: set = set()
+        self.offline_misses: set = set()
+        self.missing_offline = False
         self.enabled = True
         self.pool = QThreadPool(self)
         self.pool.setMaxThreadCount(4)   # be a good citizen towards the tile server
         self.signals = _TileSignals()
         self.signals.ready.connect(self._store)
         self.signals.failed.connect(self._fail)
+        self.signals.offline.connect(self._offline_miss)
+
+        # Coming back online, previously unreachable tiles deserve another go.
+        from ...connectivity import monitor
+
+        monitor().add_listener(self._connectivity_changed)
 
     def get(self, zoom: int, x: int, y: int) -> Optional[QPixmap]:
         key = f"{zoom}/{x}/{y}"
         if key in self.memory:
             return self.memory[key]
         if key in self.pending or key in self.failed or not self.enabled:
+            return None
+        if key in self.offline_misses:
             return None
         self.pending.add(key)
         self.pool.start(
@@ -170,8 +190,48 @@ class TileCache(QObject):
         self.pending.discard(key)
         self.failed.add(key)
 
+    def _offline_miss(self, key: str) -> None:
+        """Not a failure - just nothing cached for a tile we cannot fetch."""
+        self.pending.discard(key)
+        self.offline_misses.add(key)
+        self.missing_offline = True
+
+    def _connectivity_changed(self, state) -> None:
+        if state.usable and self.offline_misses:
+            # Retry only what the lack of a connection blocked.
+            self.offline_misses.clear()
+            self.missing_offline = False
+            self.tileReady.emit()
+
     def clear_failures(self) -> None:
         self.failed.clear()
+        self.offline_misses.clear()
+        self.missing_offline = False
+
+    def disk_usage_mb(self) -> float:
+        """How much of the disk the tile cache is using."""
+        try:
+            return sum(
+                f.stat().st_size for f in self.directory.rglob("*.png") if f.is_file()
+            ) / 1024 / 1024
+        except OSError:
+            return 0.0
+
+    def clear_disk(self) -> int:
+        """Delete the cached tiles. Returns how many files went."""
+        removed = 0
+        try:
+            for file in self.directory.rglob("*.png"):
+                try:
+                    file.unlink()
+                    removed += 1
+                except OSError:
+                    continue
+        except OSError:
+            pass
+        self.memory.clear()
+        self.clear_failures()
+        return removed
 
     def shutdown(self, timeout_ms: int = 2000) -> None:
         """Stop fetching and let queued jobs drain quietly."""
@@ -477,10 +537,22 @@ class MapWidget(QWidget):
             readout = f"z{self.zoom}  cursor {self._cursor_lat:.4f}, {self._cursor_lon:.4f}"
         painter.drawText(QPointF(self.width() - 232, self.height() - 4), readout)
 
+        notice = ""
         if not self.cache.enabled:
+            notice = "Map tiles are turned off"
+        elif self.cache.missing_offline:
+            from ...connectivity import state as network_state
+
+            current = network_state()
+            notice = (
+                "Working offline - showing cached map tiles only"
+                if current.blocked_by_choice
+                else "No connection - showing cached map tiles only"
+            )
+        if notice:
             painter.fillRect(QRect(0, 0, self.width(), 20), QColor(255, 240, 210, 230))
             painter.setPen(QColor("#8a5a00"))
-            painter.drawText(QPointF(8, 14), "Offline: map tiles are not being fetched")
+            painter.drawText(QPointF(8, 14), notice)
 
     # -- interaction ---------------------------------------------------
     def mousePressEvent(self, event) -> None:

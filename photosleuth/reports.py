@@ -75,13 +75,63 @@ def geotagged(records: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [record for record in records if record and record.get("gps")]
 
 
-def generate_map(records: Iterable[Dict[str, Any]], output_file) -> Path:
-    """Plot every geotagged image on an interactive HTML map."""
-    try:
-        import folium
-    except ImportError as exc:  # pragma: no cover - import guard
-        raise ImportError("Missing 'folium'. Install: pip install folium") from exc
+VENDOR = Path(__file__).resolve().parent / "assets" / "vendor"
 
+MAP_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>__TITLE__</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>__CSS__</style>
+<style>
+  html, body, #map { height: 100%; margin: 0; }
+  body { font-family: "Segoe UI", Helvetica, Arial, sans-serif; }
+  .ps-popup b { font-size: 13px; }
+  .ps-popup .muted { color: #5f6f83; }
+  .ps-offline { position: absolute; z-index: 1000; top: 8px; left: 50%;
+                transform: translateX(-50%); background: #fff0d2; color: #8a5a00;
+                padding: 6px 12px; border-radius: 4px; font-size: 12px;
+                box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+</style>
+</head><body>
+<div id="map"></div>
+<div class="ps-offline" id="offline" style="display:none">
+  Map tiles could not be loaded — markers are still positioned correctly.
+</div>
+<script>__JS__</script>
+<script>
+  var points = __POINTS__;
+  var map = L.map('map');
+  var tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap contributors'
+  });
+  var failures = 0;
+  tiles.on('tileerror', function () {
+    if (++failures > 3) { document.getElementById('offline').style.display = 'block'; }
+  });
+  tiles.addTo(map);
+
+  var bounds = [];
+  points.forEach(function (p) {
+    bounds.push([p.lat, p.lon]);
+    L.marker([p.lat, p.lon]).addTo(map).bindPopup(p.html, { maxWidth: 320 })
+     .bindTooltip(p.name);
+  });
+  if (bounds.length === 1) { map.setView(bounds[0], 15); }
+  else if (bounds.length) { map.fitBounds(bounds, { padding: [40, 40] }); }
+  else { map.setView([20, 0], 2); }
+</script>
+</body></html>
+"""
+
+
+def generate_map(records: Iterable[Dict[str, Any]], output_file, title: str = "PhotoSleuth map") -> Path:
+    """Plot every geotagged image on a self-contained interactive HTML map.
+
+    Leaflet is embedded in the file rather than pulled from a CDN, so the page
+    opens and the markers are positioned correctly with no internet at all.
+    Only the basemap tiles need a connection, and the page says so plainly
+    instead of rendering a blank grey square.
+    """
     points = geotagged(records)
     if not points:
         raise ValueError("No geotagged images to plot.")
@@ -90,36 +140,56 @@ def generate_map(records: Iterable[Dict[str, Any]], output_file) -> Path:
     if path.parent and not path.parent.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
 
-    latitudes = [point["gps"]["latitude"] for point in points]
-    longitudes = [point["gps"]["longitude"] for point in points]
-    centre = [sum(latitudes) / len(latitudes), sum(longitudes) / len(longitudes)]
-
-    fmap = folium.Map(location=centre, zoom_start=5, tiles="OpenStreetMap")
-
+    payload = []
     for point in points:
         gps = point["gps"]
         name = point.get("name") or Path(point.get("file", "")).name
-        popup_lines = [f"<b>{_escape(name)}</b>"]
+        lines = [f"<b>{_escape(name)}</b>"]
         if point.get("date_taken"):
-            popup_lines.append(f"Taken: {_escape(point['date_taken'])}")
+            lines.append(f"Taken: {_escape(point['date_taken'])}")
         if point.get("location"):
-            popup_lines.append(_escape(point["location"]))
-        popup_lines.append(f"{gps['latitude']:.6f}, {gps['longitude']:.6f}")
+            lines.append(f"<span class='muted'>{_escape(point['location'])}</span>")
+        lines.append(f"{gps['latitude']:.6f}, {gps['longitude']:.6f}")
         if point.get("map_url"):
-            popup_lines.append(f"<a href='{_escape(point['map_url'])}' target='_blank'>Google Maps</a>")
+            lines.append(
+                f"<a href='{_escape(point['map_url'])}' target='_blank' "
+                "rel='noopener'>Open in Google Maps</a>"
+            )
+        payload.append({
+            "lat": round(float(gps["latitude"]), 6),
+            "lon": round(float(gps["longitude"]), 6),
+            "name": _escape(name),
+            "html": "<div class='ps-popup'>" + "<br>".join(lines) + "</div>",
+        })
 
-        folium.Marker(
-            location=[gps["latitude"], gps["longitude"]],
-            popup=folium.Popup("<br>".join(popup_lines), max_width=320),
-            tooltip=name,
-            icon=folium.Icon(color="red", icon="camera", prefix="fa"),
-        ).add_to(fmap)
+    import json as _json
 
-    if len(points) > 1:
-        fmap.fit_bounds([[min(latitudes), min(longitudes)], [max(latitudes), max(longitudes)]])
-
-    fmap.save(str(path))
+    page = (
+        MAP_PAGE
+        .replace("__CSS__", _read_vendor("leaflet.css"))
+        .replace("__JS__", _read_vendor("leaflet.js"))
+        .replace("__POINTS__", _json.dumps(payload))
+        .replace("__TITLE__", _escape(title))
+    )
+    path.write_text(page, encoding="utf-8")
     return path
+
+
+def _read_vendor(name: str) -> str:
+    """Inline a bundled asset, or fall back to the CDN if it is missing."""
+    candidate = VENDOR / name
+    try:
+        return candidate.read_text(encoding="utf-8")
+    except OSError:
+        version = "1.9.4"
+        kind = "css" if name.endswith("css") else "js"
+        return (
+            f"/* bundled {name} missing; loading from CDN */\n"
+            f"@import url('https://cdnjs.cloudflare.com/ajax/libs/leaflet/{version}/leaflet.{kind}');"
+            if kind == "css" else
+            f"document.write('<script src=\"https://cdnjs.cloudflare.com/ajax/libs/"
+            f"leaflet/{version}/leaflet.js\"><\\/script>');"
+        )
 
 
 def _escape(text: Any) -> str:
@@ -553,6 +623,12 @@ def _paste_tiles(canvas, left: float, top: float, width: int, height: int,
     except ImportError:
         return False
 
+    from .connectivity import is_online
+
+    # Offline the markers are still plotted; only the basemap is missing.
+    if not is_online():
+        return False
+
     from . import __version__
 
     session = requests.Session()
@@ -623,8 +699,8 @@ def export_map_png(
     """Write a map PNG.
 
     Accepts either a list of metadata records (preferred) or the path of a
-    previously saved folium HTML file, whose markers are read back out, so
-    older callers keep working.
+    previously saved map page, whose markers are read back out, so older
+    callers keep working.
     """
     if output_file is None:
         raise ValueError("export_map_png() needs an output file.")
@@ -637,17 +713,40 @@ def export_map_png(
 
 
 def _records_from_map_html(path: Path) -> List[Dict[str, Any]]:
-    """Recover marker coordinates from a folium map saved by generate_map()."""
+    """Recover marker coordinates from a saved map page.
+
+    Reads PhotoSleuth's own export, which embeds the points as JSON, and falls
+    back to the inline ``L.marker`` calls that folium-era files used.
+    """
+    import json
     import re
 
     if not path.is_file():
         raise FileNotFoundError(f"Map file not found: {path}")
     text = path.read_text(encoding="utf-8", errors="ignore")
-    pairs = re.findall(r"L\.marker\(\s*\[([-\d.]+),\s*([-\d.]+)\]", text)
-    records = [
-        {"gps": {"latitude": float(lat), "longitude": float(lon)}, "name": ""}
-        for lat, lon in pairs
-    ]
+
+    records: List[Dict[str, Any]] = []
+    match = re.search(r"var points = (\[.*?\]);", text, re.S)
+    if match:
+        try:
+            for entry in json.loads(match.group(1)):
+                records.append({
+                    "gps": {
+                        "latitude": float(entry["lat"]),
+                        "longitude": float(entry["lon"]),
+                    },
+                    "name": entry.get("name", ""),
+                })
+        except (ValueError, KeyError, TypeError):
+            records = []
+
+    if not records:
+        pairs = re.findall(r"L\.marker\(\s*\[([-\d.]+),\s*([-\d.]+)\]", text)
+        records = [
+            {"gps": {"latitude": float(lat), "longitude": float(lon)}, "name": ""}
+            for lat, lon in pairs
+        ]
+
     if not records:
         raise ValueError("No markers found in that map file.")
     return records

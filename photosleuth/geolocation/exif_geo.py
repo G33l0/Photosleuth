@@ -123,40 +123,16 @@ def recorded_offset_hours(metadata: Dict[str, Any]) -> Optional[float]:
 
 def true_offset_hours(latitude: float, longitude: float, moment: datetime) -> Optional[float]:
     """The UTC offset actually in force at a place on a date."""
-    try:
-        from timezonefinder import TimezoneFinder
-        from zoneinfo import ZoneInfo
-    except ImportError:
-        return None
+    from .timezones import offset_at
 
-    name = _finder().timezone_at(lat=latitude, lng=longitude)
-    if not name:
-        return None
-    try:
-        aware = moment.replace(tzinfo=ZoneInfo(name))
-        return aware.utcoffset().total_seconds() / 3600.0
-    except Exception:
-        return None
-
-
-_finder_instance = None
-
-
-def _finder():
-    """One TimezoneFinder for the process; building it is the expensive part."""
-    global _finder_instance
-    if _finder_instance is None:
-        from timezonefinder import TimezoneFinder
-
-        _finder_instance = TimezoneFinder()
-    return _finder_instance
+    offset, _lookup = offset_at(latitude, longitude, moment)
+    return offset
 
 
 def timezone_name(latitude: float, longitude: float) -> Optional[str]:
-    try:
-        return _finder().timezone_at(lat=latitude, lng=longitude)
-    except Exception:
-        return None
+    from .timezones import zone_at
+
+    return zone_at(latitude, longitude).name
 
 
 # --------------------------------------------------------------------------
@@ -175,6 +151,7 @@ class TimezoneCheck:
     recorded_offset: Optional[float] = None
     true_offset: Optional[float] = None
     timezone: Optional[str] = None
+    near_border: bool = False
     utc_time: Optional[datetime] = None
     local_time: Optional[datetime] = None
     message: str = ""
@@ -195,6 +172,7 @@ class TimezoneCheck:
             "recorded_offset": self.recorded_offset,
             "true_offset": self.true_offset,
             "timezone": self.timezone,
+            "near_border": self.near_border,
             "utc_time": self.utc_time.isoformat() if self.utc_time else None,
             "local_time": self.local_time.isoformat() if self.local_time else None,
             "message": self.message,
@@ -272,14 +250,17 @@ def check_timezone(metadata: Dict[str, Any], tolerance_hours: float = 0.5) -> Ti
         result.message = "No capture time to check against."
         return result
 
-    result.timezone = timezone_name(latitude, longitude)
-    result.true_offset = true_offset_hours(latitude, longitude, reference)
+    from .timezones import offset_at
+
+    result.true_offset, zone = offset_at(latitude, longitude, reference)
+    result.timezone = zone.name
+    result.near_border = zone.near_border
 
     if result.true_offset is None:
         result.verdict = "unknown"
         result.message = (
-            "Time-zone lookup is unavailable, so the offset could not be verified. "
-            "Install the 'timezonefinder' package to enable this check."
+            "No time zone applies at these coordinates (open sea), or the zone "
+            "database could not be read, so the offset could not be verified."
         )
         return result
 
@@ -301,6 +282,17 @@ def check_timezone(metadata: Dict[str, Any], tolerance_hours: float = 0.5) -> Ti
             "A clock left on another zone after travelling, a daylight-saving slip, or "
             "a region that keeps time far from its sun would all look like this, so "
             "this is worth checking rather than treating as proof of anything."
+        )
+    elif result.near_border:
+        # The shipped raster resolves to about 28 km, so a point this close to a
+        # boundary may simply have been placed in the neighbouring zone. That is
+        # a limit of the lookup, not evidence about the photograph.
+        result.verdict = "questionable"
+        result.message = (
+            f"The file implies UTC{result.implied_offset:+g} while the lookup puts these "
+            f"coordinates in {result.timezone} (UTC{result.true_offset:+g}). They sit close "
+            "to a time-zone boundary, so the zone itself is uncertain here and this "
+            "difference may mean nothing."
         )
     else:
         result.verdict = "inconsistent"

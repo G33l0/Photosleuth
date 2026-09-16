@@ -26,11 +26,10 @@ from photosleuth import __version__  # noqa: E402
 datas = [
     (str(PACKAGE / "assets"), "photosleuth/assets"),
 ]
-# folium ships its Jinja templates and JS as package data.
-datas += collect_data_files("folium")
-datas += collect_data_files("branca")
-# timezonefinder ships binary boundary data the geolocation checks depend on.
-datas += collect_data_files("timezonefinder")
+# Leaflet is vendored under assets/vendor, so no folium/branca/xyzservices.
+# timezonefinder is deliberately NOT bundled: its 32 MB of boundary polygons is
+# replaced by the 43 KB raster in assets/timezones.bin, built by
+# tools/build_timezone_raster.py.
 
 hiddenimports = [
     "photosleuth.gui",
@@ -48,6 +47,8 @@ hiddenimports += collect_submodules("photosleuth")
 excludes = [
     "tkinter", "matplotlib", "numpy.distutils", "pytest", "setuptools",
     "cryptography", "OpenSSL", "oauthlib", "jwt", "IPython", "notebook",
+    "timezonefinder", "timezonefinder_data", "h3",
+    "folium", "branca", "xyzservices",
     "PySide6.Qt3DCore", "PySide6.Qt3DRender", "PySide6.Qt3DInput",
     "PySide6.Qt3DLogic", "PySide6.Qt3DAnimation", "PySide6.Qt3DExtras",
     "PySide6.QtCharts", "PySide6.QtDataVisualization", "PySide6.QtQuick3D",
@@ -80,6 +81,29 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
+
+# Excluding a PySide6 Python module does not stop PyInstaller bundling the Qt
+# shared library behind it, because Qt6Core links them. These are the QML/Quick
+# and PDF stacks, which a widgets-only application never loads; dropping them
+# saves about 20 MB. The frozen build is smoke-tested in CI to catch any that
+# turn out to be needed after all.
+UNUSED_QT_LIBRARIES = (
+    "libQt6Quick", "libQt6Qml", "libQt6QmlModels", "libQt6QmlWorkerScript",
+    "libQt6QuickParticles", "libQt6QuickShapes", "libQt6QuickTest",
+    "libQt6Pdf", "libQt6Designer", "libQt6Test", "libQt6Sql",
+    "libQt6VirtualKeyboard", "libQt6Charts", "libQt6DataVisualization",
+    "Qt6Quick", "Qt6Qml", "Qt6Pdf",
+)
+
+
+def _is_unused(entry) -> bool:
+    name = Path(entry[0]).name
+    return any(name.startswith(prefix) for prefix in UNUSED_QT_LIBRARIES)
+
+
+_before = len(a.binaries)
+a.binaries = TOC([entry for entry in a.binaries if not _is_unused(entry)])
+print(f"Dropped {_before - len(a.binaries)} unused Qt libraries")
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 

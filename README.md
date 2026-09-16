@@ -19,6 +19,7 @@ Developed by **IamG2**.
 ## 📑 Table of Contents
 
 - [Desktop Application](#-desktop-application)
+- [Working Offline](#-working-offline)
 - [Geolocation](#-geolocation)
 - [Features](#-features)
 - [Installation](#-installation)
@@ -61,6 +62,50 @@ photosleuth-gui          # installed entry point
 photosleuth --gui        # or via the CLI
 python -m photosleuth.gui
 ```
+
+---
+
+## 📴 Working Offline
+
+**PhotoSleuth is an offline tool that can use the internet, not an online tool
+that breaks without it.** Everything below runs with no connection at all:
+
+| Works offline | Needs the internet |
+| ------------- | ------------------ |
+| EXIF and metadata extraction | Address lookup (new coordinates) |
+| Forensics: thumbnail comparison, hashes | Map tiles for areas you have not visited |
+| Time-zone consistency, GPS quality, view cone | Reverse image search |
+| Shadow and solar geolocation, resection | Place-name search when geotagging |
+| Measurements, compare, timeline | Update checks |
+| Metadata stripping and manual geotagging | |
+| Every report: PDF, HTML, CSV, JSON, maps | |
+| Chain of custody | |
+
+### How it degrades
+
+- **Nothing hangs.** A feature that needs the network finds out in
+  milliseconds rather than waiting for a socket timeout inside a batch.
+- **Caches keep working.** Addresses you have looked up before and map tiles
+  you have already viewed are stored on disk and used offline. Pan around an
+  area while connected and it is available later.
+- **Exported maps are self-contained.** Leaflet is embedded in the HTML rather
+  than pulled from a CDN, so an exported map opens and positions its markers
+  with no connection; only the basemap needs one, and the page says so.
+- **Static map PNGs still plot.** Without tiles the markers are drawn on a
+  plain background rather than failing.
+- **It recovers by itself.** Connectivity is re-checked in the background and
+  features re-enable when it returns.
+
+### Working offline on purpose
+
+The status bar shows **Online**, **Offline** or **Working offline**, and
+clicking it switches mode. **Work offline** is a privacy control as much as a
+connectivity one: with it on, no image, coordinate or query leaves the machine
+for any reason, and PhotoSleuth does not even probe for a connection.
+
+That matters for the material this tool is pointed at. Reverse image search
+uploads the picture to a third party; address lookup sends coordinates. Offline
+mode guarantees neither happens.
 
 ---
 
@@ -135,6 +180,9 @@ you pan. Map data © OpenStreetMap contributors.
 - **CSV export** – exports a metadata table for spreadsheets.
 - **Batch processing** – analyse whole folders, optionally recursively; one bad file
   never aborts the run.
+- **Offline-first** – everything but address lookup, map tiles, reverse search
+  and update checks works with no connection; a one-click "work offline" mode
+  guarantees nothing leaves the machine.
 - **Persistent configuration & geocode cache** – stored in a per-user directory.
 - **Geolocation** – shadow geometry, solar position, EXIF cross-checks and
   landmark resection, fused into a single probability map with a per-constraint
@@ -209,6 +257,7 @@ yourself.
 | `Ctrl+M` | Open in Maps |
 | `F7` | Open the Evidence Board |
 | `F8` | Measure a shadow on the photo |
+| `F9` | Reverse image search (needs a connection) |
 | `Ctrl+E` | Export report |
 | `Ctrl+L` | Chain of custody |
 | `Ctrl+,` | Settings |
@@ -290,6 +339,10 @@ you launch it from:
 | -------- | -------- |
 | Windows  | `%APPDATA%\PhotoSleuth\config.json` |
 | Portable | `PhotoSleuthData\config.json` next to the executable |
+
+Caches live beside it: `geocode_cache.json` for looked-up addresses and
+`tile_cache/` for map tiles. Both are used offline and can be cleared from
+**Settings → Network**.
 | Linux    | `~/.config/photosleuth/config.json` |
 | macOS    | `~/.config/photosleuth/config.json` |
 
@@ -328,9 +381,24 @@ The installer offers optional Explorer integration, "Open with" registration
 (it never hijacks your default image viewer) and adding the CLI to `PATH`. It
 installs per-user by default, so no administrator prompt appears.
 
-Expect roughly **200 MB installed** and a **~90 MB installer** — Qt, Pillow and
-NumPy account for most of it. Pass `-SkipInstaller` to build only the
-application folder.
+Expect roughly **220 MB installed** and an installer around **80–90 MB**. Qt
+(119 MB) and NumPy (41 MB) are the bulk and both are load-bearing: Qt is the
+interface, NumPy is the geolocation fusion engine. Measured on Linux; a Windows
+build is slightly smaller because the GTK and X11 libraries are not needed.
+Pass `-SkipInstaller` to build only the application folder.
+
+Three things keep it from being larger than that:
+
+- **The time-zone check ships a 43 KB raster, not a 32 MB library.**
+  `timezonefinder`'s boundary polygons are baked down to a quarter-degree grid
+  by `tools/build_timezone_raster.py`. It agrees with the full library on 98.9%
+  of random points, and *every* disagreement is flagged as near-a-border rather
+  than reported as fact.
+- **Maps use a vendored Leaflet (160 KB), not the folium stack**, which also
+  makes exported maps work offline.
+- **Unused Qt libraries are dropped from the bundle.** Excluding a PySide6
+  module does not remove the Qt library behind it, so the QML, Quick and PDF
+  stacks are filtered out explicitly — about 20 MB.
 
 **Portable mode:** drop an empty file named `portable.txt` next to
 `PhotoSleuth.exe` and all settings, caches and logs live in a `PhotoSleuthData`
@@ -383,7 +451,7 @@ for candidate in board.candidates(count=3):
 
 ```bash
 pip install -e ".[dev]"
-pytest                      # 345 tests, including offscreen GUI tests
+pytest                      # 420 tests, including offscreen GUI tests
 pytest -W error::DeprecationWarning   # run strict
 ```
 

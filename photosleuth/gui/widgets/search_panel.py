@@ -47,6 +47,7 @@ class SearchPanel(QWidget):
         self._path: Optional[str] = None
         self._result: Optional[Dict[str, Any]] = None
         self._thumb_worker = None
+        self._online_state = None
         colours = theme.palette()
 
         from ...search import available_engines
@@ -107,8 +108,34 @@ class SearchPanel(QWidget):
     # -- state -------------------------------------------------------------
     def set_image(self, path: Optional[str]) -> None:
         self._path = str(path) if path else None
-        self.search_button.setEnabled(bool(self._path))
+        self._update_button()
         self.file_label.setText(Path(self._path).name if self._path else tr("No images loaded"))
+
+    def set_online(self, state) -> None:
+        """Reflect the current network state in this panel."""
+        self._online_state = state
+        self._update_button()
+        if not state.usable:
+            colours = theme.palette()
+            self.summary.setHtml(
+                f"<div style='color:{colours['text_muted']}'>"
+                f"<p style='color:{colours['warning']}'><b>{state.label}</b></p>"
+                f"<p>Reverse image search sends the picture to a web service, so it "
+                f"needs a connection. {state.detail}</p>"
+                "<p>Everything else in PhotoSleuth - metadata, forensics, shadow "
+                "geolocation and reports - works without one.</p></div>"
+            )
+        elif self.results.count() == 0:
+            self._set_placeholder()
+
+    def _update_button(self) -> None:
+        state = getattr(self, "_online_state", None)
+        usable = state.usable if state is not None else True
+        self.search_button.setEnabled(bool(self._path) and usable)
+        if not usable and state is not None:
+            self.search_button.setToolTip(state.detail)
+        else:
+            self.search_button.setToolTip("")
 
     def current_engine(self) -> str:
         return self.engine_box.currentData() or "google_vision"

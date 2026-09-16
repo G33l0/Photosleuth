@@ -57,6 +57,12 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "enabled": True,
         "log_file": "",
     },
+    "network": {
+        # automatic: use the internet when it is available.
+        # offline:   never touch it, whatever is available.
+        "mode": "automatic",
+        "warn_before_upload": True,
+    },
     "updates": {
         "check_on_startup": False,
         "repository": "G33l0/Photosleuth",

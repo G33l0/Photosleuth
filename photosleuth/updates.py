@@ -58,6 +58,16 @@ def check_for_updates(repo: Optional[str] = None, timeout: int = 10) -> UpdateIn
     settings = load_config().get("updates", {})
     repo = repo or settings.get("repository") or DEFAULT_REPO
 
+    from .connectivity import state as network_state
+
+    current = network_state()
+    if not current.usable:
+        info.error = (
+            "PhotoSleuth is set to work offline"
+            if current.blocked_by_choice else "there is no internet connection"
+        )
+        return info
+
     try:
         import requests
     except ImportError:

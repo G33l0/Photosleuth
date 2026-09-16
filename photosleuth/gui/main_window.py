@@ -59,6 +59,7 @@ from .widgets.forensics_panel import ForensicsPanel
 from .widgets.image_viewer import ImageViewer
 from .widgets.measure_overlay import MeasureMode
 from .widgets.metadata_tree import MetadataTree
+from .widgets.network_status import NetworkStatusButton
 from .widgets.search_panel import SearchPanel
 from .widgets.thumbnail_grid import ThumbnailGrid, collect_dropped_paths
 from .widgets.timeline_view import TimelineView
@@ -256,6 +257,10 @@ class MainWindow(QMainWindow):
         self.act_settings = make(tr("Settings"), self.show_settings, "Ctrl+,", "settings")
         self.act_about = make(tr("About"), self.show_about)
         self.act_updates = make(tr("Check for Updates…"), lambda: self.check_updates(False))
+        self.act_search_online = make(
+            tr("Reverse Search"), self._focus_search, "F9", "web",
+            tip="Search the web for this image (needs an internet connection)",
+        )
 
         self.act_zoom_in = make(tr("Zoom In"), lambda: self.viewer.canvas.zoom(1.25), "Ctrl+=", "zoom-in")
         self.act_zoom_out = make(tr("Zoom Out"), lambda: self.viewer.canvas.zoom(0.8), "Ctrl+-", "zoom-out")
@@ -327,6 +332,7 @@ class MainWindow(QMainWindow):
         tools_menu.addAction(self.act_strip)
         tools_menu.addAction(self.act_open_maps)
         tools_menu.addSeparator()
+        tools_menu.addAction(self.act_search_online)
         tools_menu.addAction(self.act_geolocate)
         tools_menu.addAction(self.act_measure_shadow)
         tools_menu.addAction(self.act_stop_measuring)
@@ -372,9 +378,13 @@ class MainWindow(QMainWindow):
         self.cancel_button.setVisible(False)
         self.cancel_button.clicked.connect(self.cancel_tasks)
 
+        self.network_status = NetworkStatusButton(self)
+        self.network_status.stateChanged.connect(self._network_state_changed)
+
         bar.addWidget(self.status_label, 1)
         bar.addPermanentWidget(self.progress)
         bar.addPermanentWidget(self.cancel_button)
+        bar.addPermanentWidget(self.network_status)
         self.setStatusBar(bar)
 
     # ------------------------------------------------------------------
@@ -658,6 +668,12 @@ class MainWindow(QMainWindow):
                 self._start_analysis(touched)
                 self.status_message(f"Updated the location of {len(touched)} image(s).")
 
+    def _focus_search(self) -> None:
+        if not self._current_path:
+            self.status_message("Select an analysed image first.")
+            return
+        self.tabs.setCurrentWidget(self.search)
+
     def open_geolocate(self) -> None:
         """Show the Evidence Board for the current image."""
         if not self._current_path:
@@ -747,6 +763,7 @@ class MainWindow(QMainWindow):
         size = int(self.ui_settings.get("thumbnail_size", 160))
         self.model.set_thumbnail_size(size)
         self.grid.set_thumbnail_size(size)
+        self.network_status.refresh()
         self.status_message("Settings saved.")
 
     def show_about(self) -> None:
@@ -794,7 +811,7 @@ class MainWindow(QMainWindow):
             (self.act_settings, "settings"), (self.act_custody, "custody"),
             (self.act_cancel, "cancel"), (self.act_reanalyze, "refresh"),
             (self.act_forensics_selected, "shield"), (self.act_geolocate, "pin"),
-            (self.act_measure_shadow, "analyze"),
+            (self.act_measure_shadow, "analyze"), (self.act_search_online, "web"),
             (self.act_open_maps, "map"),
         ):
             action.setIcon(icon(name, colours["icon"]))
@@ -879,6 +896,25 @@ class MainWindow(QMainWindow):
         self.act_report_selected.setEnabled(selected > 0)
         self.act_geolocate.setEnabled(bool(self._current_path))
         self.act_measure_shadow.setEnabled(bool(self._current_path))
+        from .. import connectivity as net
+
+        self.act_search_online.setEnabled(bool(self._current_path) and net.state().usable)
+
+    def _network_state_changed(self, state) -> None:
+        """Enable or disable the features that genuinely need a connection."""
+        usable = state.usable
+        for action, name in (
+            (self.act_search_online, "Reverse image search"),
+            (self.act_updates, "Checking for updates"),
+        ):
+            action.setEnabled(usable)
+            action.setToolTip(
+                "" if usable else
+                f"{name} needs the internet. "
+                + ("Offline mode is on." if state.blocked_by_choice else "No connection.")
+            )
+        if hasattr(self, "search"):
+            self.search.set_online(state)
 
     def status_message(self, text: str) -> None:
         self.status_label.setText(text)

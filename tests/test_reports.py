@@ -44,10 +44,33 @@ def test_geotagged_filters_correctly(records):
     assert len(geotagged(records)) == 2
 
 
-def test_map_contains_a_marker_per_geotagged_image(tmp_path, records):
+def test_map_contains_a_point_per_geotagged_image(tmp_path, records):
+    import json
+    import re
+
     target = generate_map(records, tmp_path / "map.html")
     html = target.read_text(encoding="utf-8")
-    assert html.count("L.marker") == 2
+    points = json.loads(re.search(r"var points = (\[.*?\]);", html, re.S).group(1))
+    assert len(points) == 2
+    assert all("lat" in point and "lon" in point for point in points)
+
+
+def test_map_is_self_contained(tmp_path, records):
+    """The page must open with no internet: Leaflet is embedded, not fetched."""
+    html = generate_map(records, tmp_path / "map.html").read_text(encoding="utf-8")
+    assert "cdnjs.cloudflare.com" not in html
+    assert "L.map" in html and "leaflet" in html.lower()
+
+
+def test_map_round_trips_through_the_reader(tmp_path, records):
+    from photosleuth.reports import _records_from_map_html
+
+    target = generate_map(records, tmp_path / "map.html")
+    recovered = _records_from_map_html(target)
+    assert len(recovered) == 2
+    assert recovered[0]["gps"]["latitude"] == pytest.approx(
+        records[0]["gps"]["latitude"], abs=1e-5
+    )
 
 
 def test_map_escapes_popup_content(tmp_path, records):

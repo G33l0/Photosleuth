@@ -210,6 +210,18 @@ class GeotagDialog(QDialog):
         query = self.place_box.text().strip()
         if not query:
             return
+
+        from ...connectivity import state as network_state
+
+        current = network_state()
+        if not current.usable:
+            self.status.setText(
+                "⚠ Place search needs the internet. "
+                + ("Offline mode is on." if current.blocked_by_choice else "No connection.")
+                + " You can still type or paste coordinates."
+            )
+            return
+
         self.status.setText("Looking up…")
         try:
             from geopy.geocoders import Nominatim

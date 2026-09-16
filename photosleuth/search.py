@@ -64,6 +64,14 @@ def reverse_image_search(image_path, engine: str = None, timeout: int = 30) -> D
     confirm with the user before invoking it on sensitive images.
     """
     engine = engine or load_config().get("default_search_engine", "google_vision")
+
+    from .connectivity import OfflineError, require
+
+    try:
+        require("Reverse image search")
+    except OfflineError as exc:
+        raise SearchError(str(exc)) from exc
+
     if engine == "google_vision":
         return _google_vision_search(image_path, timeout=timeout)
     if engine == "tineye":
@@ -89,6 +97,7 @@ def open_in_browser(image_path, engine: str) -> Dict[str, Any]:
 
     label, url = BROWSER_ENGINES[engine]
     opened = False
+    # The browser itself needs the connection; opening a dead page helps nobody.
     try:
         opened = webbrowser.open(url)
     except Exception:

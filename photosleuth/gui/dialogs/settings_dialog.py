@@ -82,6 +82,7 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(self._analysis_tab(), tr("Analyze"))
         self.tabs.addTab(self._keys_tab(), tr("Reverse Search"))
         self.tabs.addTab(self._reports_tab(), tr("Reports"))
+        self.tabs.addTab(self._network_tab(), "Network")
         self.tabs.addTab(self._system_tab(), "System")
 
         buttons = QDialogButtonBox(
@@ -269,6 +270,95 @@ class SettingsDialog(QDialog):
         layout.addStretch(1)
         return page
 
+    def _network_tab(self) -> QWidget:
+        page = QWidget(self)
+        layout = QVBoxLayout(page)
+        colours = theme.palette()
+
+        mode_group = QGroupBox("Internet access", page)
+        mode_layout = QVBoxLayout(mode_group)
+        self.network_mode = QComboBox(mode_group)
+        self.network_mode.addItem("Use the internet when it is available", "automatic")
+        self.network_mode.addItem("Work offline — never use the internet", "offline")
+        mode_layout.addWidget(self.network_mode)
+
+        explanation = QLabel(
+            "PhotoSleuth does almost everything without a connection: metadata, "
+            "forensics, EXIF checks, shadow and landmark geolocation, measurements "
+            "and every report format.<br><br>"
+            "The internet is used only for <b>address lookup</b>, <b>map tiles</b>, "
+            "<b>reverse image search</b> and <b>update checks</b>. Offline, cached "
+            "addresses and map tiles are still used and nothing stalls waiting for "
+            "a connection.<br><br>"
+            "<b>Work offline</b> is also a privacy setting: with it on, no image, "
+            "coordinate or query leaves this machine for any reason.",
+            mode_group,
+        )
+        explanation.setWordWrap(True)
+        explanation.setStyleSheet(f"color: {colours['text_muted']};")
+        mode_layout.addWidget(explanation)
+
+        self.warn_before_upload = QCheckBox(
+            "Ask before sending an image to a web service", mode_group
+        )
+        mode_layout.addWidget(self.warn_before_upload)
+
+        cache_group = QGroupBox("Offline map cache", page)
+        cache_layout = QVBoxLayout(cache_group)
+        self.cache_label = QLabel("", cache_group)
+        self.cache_label.setWordWrap(True)
+        cache_layout.addWidget(self.cache_label)
+
+        cache_hint = QLabel(
+            "Map tiles you have already viewed are kept on disk and redrawn when "
+            "you are offline. Panning around an area while connected is enough to "
+            "make it available later.",
+            cache_group,
+        )
+        cache_hint.setWordWrap(True)
+        cache_hint.setStyleSheet(f"color: {colours['text_muted']};")
+        cache_layout.addWidget(cache_hint)
+
+        buttons = QHBoxLayout()
+        refresh = QPushButton("Refresh", cache_group)
+        refresh.clicked.connect(self._refresh_cache_size)
+        clear_tiles = QPushButton("Clear map cache", cache_group)
+        clear_tiles.clicked.connect(self._clear_tile_cache)
+        clear_geo = QPushButton("Clear address cache", cache_group)
+        clear_geo.clicked.connect(self._clear_geocode_cache)
+        for button in (refresh, clear_tiles, clear_geo):
+            buttons.addWidget(button)
+        buttons.addStretch(1)
+        cache_layout.addLayout(buttons)
+
+        layout.addWidget(mode_group)
+        layout.addWidget(cache_group)
+        layout.addStretch(1)
+        self._refresh_cache_size()
+        return page
+
+    def _refresh_cache_size(self) -> None:
+        try:
+            from ..widgets.map_widget import shared_tile_cache
+
+            megabytes = shared_tile_cache().disk_usage_mb()
+        except Exception:
+            megabytes = 0.0
+        self.cache_label.setText(f"Cached map tiles: <b>{megabytes:.1f} MB</b>")
+
+    def _clear_tile_cache(self) -> None:
+        from ..widgets.map_widget import shared_tile_cache
+
+        removed = shared_tile_cache().clear_disk()
+        self._refresh_cache_size()
+        QMessageBox.information(self, tr("Settings"), f"Removed {removed} cached tile(s).")
+
+    def _clear_geocode_cache(self) -> None:
+        from ...utils import default_cache
+
+        default_cache().clear()
+        QMessageBox.information(self, tr("Settings"), "Cached addresses cleared.")
+
     def _system_tab(self) -> QWidget:
         page = QWidget(self)
         layout = QVBoxLayout(page)
@@ -328,6 +418,7 @@ class SettingsDialog(QDialog):
         reports = config.get("reports", {})
         updates = config.get("updates", {})
         custody = config.get("custody", {})
+        network = config.get("network", {})
 
         self._select(self.theme_box, ui.get("theme", "system"))
         self._select(self.language_box, ui.get("language", "system"))
@@ -363,6 +454,9 @@ class SettingsDialog(QDialog):
         self.include_map.setChecked(bool(reports.get("include_map", True)))
         self.include_forensics.setChecked(bool(reports.get("include_forensics", True)))
         self.include_custody.setChecked(bool(reports.get("include_custody", False)))
+
+        self._select(self.network_mode, network.get("mode", "automatic"))
+        self.warn_before_upload.setChecked(bool(network.get("warn_before_upload", True)))
 
         self.check_updates.setChecked(bool(updates.get("check_on_startup", False)))
         self.update_repo.setText(updates.get("repository", "G33l0/Photosleuth"))
@@ -432,6 +526,10 @@ class SettingsDialog(QDialog):
                 "include_forensics": self.include_forensics.isChecked(),
                 "include_custody": self.include_custody.isChecked(),
             },
+            "network": {
+                "mode": self.network_mode.currentData() or "automatic",
+                "warn_before_upload": self.warn_before_upload.isChecked(),
+            },
             "updates": {
                 "check_on_startup": self.check_updates.isChecked(),
                 "repository": self.update_repo.text().strip() or "G33l0/Photosleuth",
@@ -446,11 +544,14 @@ class SettingsDialog(QDialog):
 
         # Geocoding settings are cached in module state; drop it so the new
         # delay and cache flag take effect immediately.
+        from ...connectivity import monitor
         from ...core import reset_geocoder
         from ...utils import reset_default_cache
 
         reset_geocoder()
         reset_default_cache()
+        # The network mode may have changed; drop the cached probe result.
+        monitor().invalidate()
 
         self.settingsChanged.emit(payload)
         self.accept()

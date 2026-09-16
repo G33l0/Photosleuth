@@ -135,9 +135,16 @@ def test_report_template_ships():
     assert (ASSETS / "templates" / "default.html").is_file()
 
 
+def test_leaflet_is_vendored_so_maps_work_offline():
+    """Exported maps must open without a CDN."""
+    assert (ASSETS / "vendor" / "leaflet.js").is_file()
+    assert (ASSETS / "vendor" / "leaflet.css").is_file()
+
+
 def test_package_data_covers_the_assets():
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    for pattern in ("assets/*.ico", "assets/i18n/*.json", "assets/templates/*.html"):
+    for pattern in ("assets/*.ico", "assets/i18n/*.json", "assets/templates/*.html",
+                    "assets/vendor/*.js", "assets/timezones.bin"):
         assert pattern in pyproject
 
 
@@ -147,11 +154,35 @@ def test_pyinstaller_spec_excludes_webengine():
     assert "photosleuth/assets" in spec
 
 
-def test_pyinstaller_spec_bundles_geolocation_data():
-    """The time-zone boundaries are data files, not importable modules."""
+def test_spec_drops_unused_qt_libraries():
+    """Excluding a PySide6 module does not drop the Qt library behind it."""
     spec = (ROOT / "packaging" / "photosleuth.spec").read_text(encoding="utf-8")
-    assert 'collect_data_files("timezonefinder")' in spec
+    assert "UNUSED_QT_LIBRARIES" in spec
+    for library in ("libQt6Quick", "libQt6Qml", "libQt6Pdf"):
+        assert library in spec
+    # QPdfWriter lives in QtGui, so PDF export must not need the Pdf module.
+    assert "PySide6.QtPdf" in spec
+
+
+def test_folium_is_not_a_dependency():
+    """Maps are rendered from a vendored Leaflet, not the folium stack."""
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+    assert "folium" not in pyproject
+    assert "folium" not in requirements
+
+
+def test_pyinstaller_spec_excludes_the_heavy_timezone_library():
+    """32 MB of boundary polygons is replaced by a 43 KB raster."""
+    spec = (ROOT / "packaging" / "photosleuth.spec").read_text(encoding="utf-8")
+    assert '"timezonefinder"' in spec.split("excludes = [")[1].split("]")[0]
     assert "photosleuth.geolocation" in spec
+
+
+def test_timezone_raster_ships_and_is_small():
+    raster = ASSETS / "timezones.bin"
+    assert raster.is_file()
+    assert raster.stat().st_size < 500_000, "the raster should stay well under a megabyte"
 
 
 def test_installer_registers_associations_without_hijacking_defaults():
@@ -171,7 +202,7 @@ def test_entry_points_are_declared():
 def test_requirements_match_project_dependencies():
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
-    for package in ("exifread", "geopy", "Pillow", "requests", "folium", "piexif",
-                    "Jinja2", "numpy", "timezonefinder"):
+    for package in ("exifread", "geopy", "Pillow", "requests", "piexif",
+                    "Jinja2", "numpy"):
         assert package in pyproject, f"{package} missing from pyproject"
         assert package in requirements, f"{package} missing from requirements.txt"
